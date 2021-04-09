@@ -10,7 +10,7 @@ With this bash script you can, via command line, list and set already configured
 This is usefull if you want e.g. to automate stuff by setting profiles with a script or to use a keyboard shortcut.
 
 ### TODO
-Check if configured displays in profile are connected.
+Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration.
 
 ### INSTALL
 ```sh
