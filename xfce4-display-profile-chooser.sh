@@ -10,7 +10,7 @@
 function list_profiles()	{
 
 	for PROFILE_ID in ${PROFILES_ID}; do
-	## TODO: check if configured displays in profile are connected.
+		## TODO: check if configured displays in profile are connected.
 		#MISSING_DISPLAY='0'
 		#PROFILE_EDIDS="$(xfconf-query -v -l -c displays -p /"${PROFILE_ID}" | grep '/EDID ' | awk '{print $2}')"
 		#for PROFILE_EDID in ${PROFILE_EDIDS}; do
@@ -70,16 +70,7 @@ With this bash script you can, via command line, list and set already configured
 This is usefull if you want e.g. to automate stuff by setting profiles with a script or to use a keyboard shortcut.
 
 ### TODO
-Check if configured displays in profile are connected.
-
-### INSTALL
-curl -o /tmp/xfce4-display-profile-chooser.sh 'https://raw.githubusercontent.com/KeyofBlueS/xfce4-display-profile-chooser/master/xfce4-display-profile-chooser.sh'
-sudo mkdir -p /opt/xfce4-display-profile-chooser/
-sudo mv /tmp/xfce4-display-profile-chooser.sh /opt/xfce4-display-profile-chooser/
-sudo chown root:root /opt/xfce4-display-profile-chooser/xfce4-display-profile-chooser.sh
-sudo chmod 755 /opt/xfce4-display-profile-chooser/xfce4-display-profile-chooser.sh
-sudo chmod +x /opt/xfce4-display-profile-chooser/xfce4-display-profile-chooser.sh
-sudo ln -s /opt/xfce4-display-profile-chooser/xfce4-display-profile-chooser.sh /usr/local/bin/xfce4-display-profile-chooser
+Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration.
 
 ### USAGE
 
