@@ -10,9 +10,19 @@
 function list_profiles()	{
 
 	for PROFILE_ID in ${PROFILES_ID}; do
+	## TODO: check if configured displays in profile are connected.
+		#MISSING_DISPLAY='0'
+		#PROFILE_EDIDS="$(xfconf-query -v -l -c displays -p /"${PROFILE_ID}" | grep '/EDID ' | awk '{print $2}')"
+		#for PROFILE_EDID in ${PROFILE_EDIDS}; do
+			#if ! echo "${CONNECTED_EDID}" | grep -q "${PROFILE_EDID}"; then
+				#MISSING_DISPLAY='1'
+			#fi
+		#done
 		PROFILE_ID="$(xfconf-query -v -l -c displays -p /"${PROFILE_ID}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}')"
 		if echo "${PROFILE_ID}" | grep -q "${ACTIVE_PROFILE}"; then
 			echo "${PROFILE_ID:1} *(active)"
+		#elif [[ "${MISSING_DISPLAY}" = '1' ]]; then
+			#echo "${PROFILE_ID:1} #(Displays missing. Cannot set this profile)"
 		else
 			echo "${PROFILE_ID:1}"
 		fi
@@ -32,11 +42,10 @@ function set_profiles()	{
 	fi
 
 	## TODO: check if configured displays in profile are connected.
-	#CONNECTED_EDID="$(some command to get current connected displays EDID the same way as seen in xconf-query)"
 	#PROFILE_EDIDS="$(xfconf-query -v -l -c displays -p /"${PROFILE_ID}" | grep '/EDID ' | awk '{print $2}')"
 	#for PROFILE_EDID in ${PROFILE_EDIDS}; do
-		#if ! echo "${PROFILE_EDID}" | grep -q "${CONNECTED_EDID}"; then
-			#echo "One or more displays in this profile are not connected. Cannot set profile ${PROFILE_ID}"
+		#if ! echo "${CONNECTED_EDID}" | grep -q "${PROFILE_EDID}"; then
+			#echo "One or more display in this profile are not connected. Cannot set profile ${PROFILE_ID}"
 			#exit 1
 		#fi
 	#done
@@ -108,6 +117,8 @@ fi
 
 PROFILES_ID="$(xfconf-query -l -c displays | awk -F'/' '{print $2}' | uniq | grep -Ev "(ActiveProfile|Default|Fallback|IdentityPopups)")"
 ACTIVE_PROFILE="$(xfconf-query -v -l -c displays | grep '/ActiveProfile' | awk '{print $2}')"
+## TODO: check if configured displays in profile are connected.
+#CONNECTED_EDID="$(some command to get current connected displays EDID the same way as seen in xconf-query)"
 
 for opt in "$@"; do
 	shift
