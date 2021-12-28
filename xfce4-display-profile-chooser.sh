@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.0.1
+# Version:    0.0.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -18,14 +18,21 @@ function list_profiles()	{
 				#MISSING_DISPLAY='1'
 			#fi
 		#done
-		PROFILE_ID="$(xfconf-query -v -l -c displays -p /"${PROFILE_ID}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}')"
+		PROFILE_NAME="$(xfconf-query -v -l -c displays -p /"${PROFILE_ID}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*')"
+		unset PROFILE_STATE
+		unset PROFILE_COLOR
 		if echo "${PROFILE_ID}" | grep -q "${ACTIVE_PROFILE}"; then
-			echo "${PROFILE_ID:1} *(active)"
+			PROFILE_STATE=', state: active'
+			PROFILE_COLOR='1;32'
 		#elif [[ "${MISSING_DISPLAY}" = '1' ]]; then
-			#echo "${PROFILE_ID:1} #(Displays missing. Cannot set this profile)"
+			#PROFILE_STATE=', state: Display/s missing, cannot set this profile'
+			#PROFILE_COLOR='1;31'
 		else
-			echo "${PROFILE_ID:1}"
+			#PROFILE_STATE=', state: available'
+			PROFILE_STATE=''
+			PROFILE_COLOR='2;32'
 		fi
+		echo -e "\e[${PROFILE_COLOR}mid: ${PROFILE_ID:1}, name: ${PROFILE_NAME:0:-1}${PROFILE_STATE}\e[0m"
 	done
 
 	exit 0
@@ -60,7 +67,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.0.1
+# Version:    0.0.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
