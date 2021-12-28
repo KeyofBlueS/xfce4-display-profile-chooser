@@ -38,7 +38,7 @@ function list_profiles()	{
 	exit 0
 }
 
-function set_profiles()	{
+function set_profile()	{
 
 	if echo "${PROFILE_ID}" | grep -q "${ACTIVE_PROFILE}"; then
 		echo "This profile (${PROFILE_ID}) is already set"
@@ -85,8 +85,8 @@ $ xfce4-display-profile-chooser <option> <value>
 
 
 Options:
--s, --set-profiles <profile_id>     Set a profile
--l, --list-profiles                 Show profiles id list
+-s, --set-profile <profile_id>      Set a profile
+-l, --list-profiles                 Show profiles list
 -h, --help                          Show this help
 "
 }
@@ -121,7 +121,7 @@ ACTIVE_PROFILE="$(xfconf-query -v -l -c displays | grep '/ActiveProfile' | awk '
 for opt in "$@"; do
 	shift
 	case "$opt" in
-		'--set-profiles')		set -- "$@" '-s' ;;
+		'--set-profile')		set -- "$@" '-s' ;;
 		'--list-profiles')		set -- "$@" '-l' ;;
 		'--help')				set -- "$@" '-h' ;;
 		*)						set -- "$@" "$opt"
@@ -130,7 +130,7 @@ done
 
 while getopts "s:lh" opt; do
 	case ${opt} in
-		s ) PROFILE_ID="${OPTARG}"; set_profiles
+		s ) PROFILE_ID="${OPTARG}"; set_profile
 		;;
 		l ) list_profiles
 		;;
