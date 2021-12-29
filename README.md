@@ -7,7 +7,7 @@
 
 ### DESCRIPTION
 With this bash script you can, via command line, list and set already configured display profiles in xfce4-display-settings.
-This is usefull if you want e.g. to automate stuff by setting profiles with a script or to use a keyboard shortcut.
+This is useful if you want e.g. to automate stuff by setting profiles with a script or to use a keyboard shortcut.
 
 ### TODO
 Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration. Please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
@@ -30,5 +30,6 @@ $ xfce4-display-profile-chooser <option> <value>
 Options:
 -s, --set-profile <profile_id>      Set a profile
 -l, --list-profiles                 Show profiles list
+-v, --list-verbose                  Show profiles list with additional info
 -h, --help                          Show this help
 ```
