@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.0.4
+# Version:    0.0.5
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -11,7 +11,7 @@ function check_connected_displays()	{
 	## TODO: check if configured displays in profile are connected. Please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
 	PROFILE_ID_CHECK="${1}"
 	MISSING_DISPLAY='0'
-	PROFILE_EDIDS="$(xfconf-query -v -l -c displays -p /"${PROFILE_ID_CHECK}" | grep '/EDID ' | awk '{print $2}')"
+	PROFILE_EDIDS="$(echo "${PROFILES_IDS_PROP}" | grep "${PROFILE_ID_CHECK}" | grep '/EDID ' | awk '{print $2}')"
 	for PROFILE_EDID in ${PROFILE_EDIDS}; do
 		for CONNECTED_EDID in ${CONNECTED_EDIDS}; do
 			if ! echo "${CONNECTED_EDID}" | grep -xq "${PROFILE_EDID}"; then
@@ -24,7 +24,7 @@ function check_connected_displays()	{
 function list_profiles()	{
 
 	for PROFILES_ID in ${PROFILES_IDS}; do
-		PROFILE_NAME="$(xfconf-query -v -l -c displays -p /"${PROFILES_ID}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*')"
+		PROFILE_NAME="$(echo "${PROFILES_IDS_PROP}" | grep "/${PROFILES_ID}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*')"
 		unset PROFILE_STATE
 		unset PROFILE_COLOR
 		if echo "${ACTIVE_PROFILE}" | grep -xq "${PROFILES_ID}"; then
@@ -52,9 +52,9 @@ function list_profiles()	{
 
 function list_profiles_verbose()	{
 
-	PROFILE_OUTPUTS="$(xfconf-query -v -l -c displays -p /"${PROFILES_ID}" | grep '/EDID ' | awk -F'/' '{print $3}')"
+	PROFILE_OUTPUTS="$(echo "${PROFILES_IDS_PROP}" | grep "${PROFILES_ID}" | grep '/EDID ' | awk -F'/' '{print $3}')"
 	for PROFILE_OUTPUT in ${PROFILE_OUTPUTS}; do
-		PROFILE_OUTPUT_PROP="$(xfconf-query -v -l -c displays -p /"${PROFILES_ID}"/"${PROFILE_OUTPUT}")"
+		PROFILE_OUTPUT_PROP="$(echo "${PROFILES_IDS_PROP}" | grep "/${PROFILES_ID}/${PROFILE_OUTPUT}")"
 
 		name="$(echo "${PROFILE_OUTPUT_PROP}" | grep "${PROFILE_OUTPUT} " | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*')"
 		edid="$(echo "${PROFILE_OUTPUT_PROP}" | grep '/EDID ' | awk '{print $2}')"
@@ -88,7 +88,8 @@ function list_profiles_verbose()	{
 
 function set_profile()	{
 
-	PROFILE_NAME="$(xfconf-query -v -l -c displays -p /"${PROFILE_ID}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*')"
+	echo
+	PROFILE_NAME="$(echo "${PROFILES_IDS_PROP}" | grep "/${PROFILE_ID}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*')"
 	if echo "${ACTIVE_PROFILE}" | grep -xq "${PROFILE_ID}"; then
 		echo -e "\e[1;33mProfile ${PROFILE_ID} - ${PROFILE_NAME:0:-1} was already set\e[0m"
 		exit 1
@@ -106,6 +107,7 @@ function set_profile()	{
 	fi
 
 	## TODO: check if configured displays in profile are connected. Please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
+	MISSING_DISPLAY=0
 	#check_connected_displays "${PROFILE_ID}"
 	if [[ "${MISSING_DISPLAY}" = '1' ]]; then
 		echo -e "\e[1;31mOne or more display in this profile are not connected. Cannot set profile ${PROFILE_ID} - ${PROFILE_NAME}\e[0m"
@@ -121,7 +123,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.0.4
+# Version:    0.0.5
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -168,11 +170,11 @@ if ! [ -z "${missing}" ]; then
 	exit 1
 fi
 
-PROFILES_IDS="$(xfconf-query -l -c displays | awk -F'/' '{print $2}' | uniq | grep -Ev "(ActiveProfile|Default|Fallback|IdentityPopups)")"
-ACTIVE_PROFILE="$(xfconf-query -v -l -c displays | grep '/ActiveProfile' | awk '{print $2}')"
+PROFILES_IDS_PROP="$(xfconf-query -v -l -c displays)"
+PROFILES_IDS="$(echo "${PROFILES_IDS_PROP}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -Ev "(ActiveProfile|Default|Fallback|IdentityPopups)")"
+ACTIVE_PROFILE="$(echo "${PROFILES_IDS_PROP}" | grep '/ActiveProfile' | awk '{print $2}')"
 
 ## TODO: check if configured displays in profile are connected. Please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
-MISSING_DISPLAY='0'
 #CONNECTED_EDIDS="$(some command to get current connected displays EDID the same way as seen in xconf-query)"
 
 for opt in "$@"; do
