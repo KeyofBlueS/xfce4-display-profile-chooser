@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.1.0
+# Version:    0.1.1
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -44,7 +44,7 @@ function list_profiles()	{
 			profile_color='1;31'
 		fi
 
-		echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name}${profile_state}\e[0m"
+		echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name::-1}${profile_state}\e[0m"
 		if [[ "${verbose}" = 'true' ]]; then
 			list_profiles_verbose
 		fi
@@ -96,7 +96,7 @@ function set_profile() {
 		echo -e "\e[1;33mProfile ${profile_id} - ${profile_name} was already set\e[0m"
 		error=1
 	fi
-	
+
 	exist=0
 	for profiles_id in ${profiles_ids}; do
 		if echo "${profiles_id}" | grep -xq "${profile_id}"; then
@@ -150,7 +150,8 @@ function yad_chooser() {
 		profile="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --button="Exit"!exit!Exit:99 \
 		--button="Help"!help-about!"Show help":98 \
 		--button="Info"!user-info!"Show profiles info":97 \
-		--button="Refresh"!view-refresh!"Refresh profiles list":96 \
+		--button="Display"!org.xfce.settings.display!"Open xfce4-display-settings":96 \
+		--button="Refresh"!view-refresh!"Refresh profiles list":95 \
 		--button="Set Profile"!dialog-apply!"Set selected profile":0)"
 		profile_choice="${?}"
 		if [[ "${profile_choice}" -eq 99 ]]; then
@@ -160,6 +161,8 @@ function yad_chooser() {
 		elif [[ "${profile_choice}" -eq 97 ]]; then
 			yad_verbose
 		elif [[ "${profile_choice}" -eq 96 ]]; then
+			xfce4-display-settings
+		elif [[ "${profile_choice}" -eq 95 ]]; then
 			true
 		elif [[ "${profile_choice}" -eq 0 ]]; then
 		profile="$(echo "${profile}" | awk -F'|' '{print $1}')"
@@ -172,6 +175,8 @@ function yad_chooser() {
 			if [[ "${error}" != '1' ]]; then
 				sleep 1.5
 			fi
+		else
+			exit 0
 		fi
 
 		unset profiles_list
@@ -200,7 +205,7 @@ function yad_verbose() {
 		verbose='true'
 		info="$(list_profiles | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
 		echo "$info" | \
-		yad ${ycommopt} --window-icon "xfce-display-external" --image "user-info" --text="Profiles info" --width=800 --height=500 --text-info --button="Exit"!exit!Exit:99 \
+		yad ${ycommopt} --window-icon "xfce-display-external" --image "user-info" --text="Profiles info:" --width=900 --height=500 --text-info --button="Exit"!exit!Exit:99 \
 		--button="Refresh"!view-refresh!"Refresh profiles info":98 \
 		--button="Go Back"!back!"Go back to profile selection menu":97
 		info_choice="${?}"
@@ -245,7 +250,7 @@ function yad_show_error() {
 function check_dependencies() {
 
 	commline_bins='xfconf-query awk cat grep'
-	gui_bins='yad'
+	gui_bins='yad xfce4-display-settings'
 	for bin in ${commline_bins} ${gui_bins}; do
 		if ! command -v "${bin}" &>/dev/null; then
 			if [[ "${bin}" = 'xfconf-query' ]]; then
@@ -253,6 +258,9 @@ function check_dependencies() {
 			fi
 			if [[ $bin = 'cat' ]]; then
 				bin="coreutils"
+			fi
+			if [[ $bin = 'xfce4-display-settings' ]]; then
+				bin="xfce4-settings"
 			fi
 			if [[ -z "${missing}" ]]; then
 				missing="${bin}"
@@ -318,7 +326,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.1.0
+# Version:    0.1.1
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
