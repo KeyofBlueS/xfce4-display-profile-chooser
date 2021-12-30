@@ -341,7 +341,7 @@ Options:
 -s, --set-profile <profile_id>      Set a profile
 -l, --list-profiles                 Show profiles list
 -v, --list-verbose                  Show profiles list with additional info
--g, --gui							Start a graphical user interface
+-g, --gui                           Start a graphical user interface
 -h, --help                          Show this help
 "
 }
