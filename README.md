@@ -1,6 +1,6 @@
 # xfce4-display-profile-chooser
 
-# Version:    0.0.5
+# Version:    0.1.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -10,7 +10,7 @@ With this bash script you can, via command line, list and set already configured
 This is useful if you want e.g. to automate stuff by setting profiles with a script or to use a keyboard shortcut.
 
 ### TODO
-Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration. Please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
+Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
 
 ### INSTALL
 ```sh
@@ -31,5 +31,6 @@ Options:
 -s, --set-profile <profile_id>      Set a profile
 -l, --list-profiles                 Show profiles list
 -v, --list-verbose                  Show profiles list with additional info
+-g, --gui                           Start a graphical user interface
 -h, --help                          Show this help
 ```
