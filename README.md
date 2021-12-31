@@ -8,6 +8,7 @@
 ### DESCRIPTION
 With this bash script you can, via command line, list and set already configured display profiles in xfce4-display-settings.
 This is useful if you want e.g. to automate stuff by setting profiles with a script or to use a keyboard shortcut.
+A graphical user interface is provided with the use of yad.
 
 ### TODO
 Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
