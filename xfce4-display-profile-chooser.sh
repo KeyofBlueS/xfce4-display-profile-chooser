@@ -195,7 +195,11 @@ function yad_chooser() {
 	yad_check_error
 
 	while true; do
-		yad_check_window
+		if pgrep -a yad | grep -q "title=xfce4-display-profile-chooser"; then
+			wmctrl -FR "xfce4-display-profile-chooser"
+			echo -e "\e[1;33mWARNING: Another instance of xfce4-display-profile-chooser is running."
+			exit 0
+		fi
 		inizialize
 		unset verbose
 		profiles="$(list_profiles | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
@@ -250,8 +254,6 @@ function yad_chooser() {
 
 function yad_help() {
 
-	yad_check_window
-
 	info_help="$(givemehelp)"
 	help_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "help-about" --width=900 --height=500 --form --field="Help":txt "${info_help}" --button="Exit"!exit!Exit:99 \
 	--button="Go Back"!back!"Go back to profile selection menu":98)"
@@ -268,7 +270,6 @@ function yad_help() {
 function yad_verbose() {
 
 	while true; do
-		yad_check_window
 		verbose='true'
 		info_verbose="$(list_profiles | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
 		verbose_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "user-info" --width=900 --height=500 --form --field="Profiles info:":txt "${info_verbose}" --field="Show Default Profile":chk "${default_profile}" --field="Show Fallback Profile":chk "${fallback_profile}" --button="Exit"!exit!Exit:99 \
@@ -309,14 +310,6 @@ function yad_check_error() {
 	fi
 }
 
-function yad_check_window() {
-
-	if pgrep -a yad | grep -q "title=xfce4-display-profile-chooser"; then
-		wmctrl -FR "xfce4-display-profile-chooser"
-		echo -e "\e[1;33mWARNING: Anothe instance of xfce4-display-profile-chooser is running."
-		exit 0
-	fi
-}
 function yad_show_error() {
 
 	echo "$error_text" | \
