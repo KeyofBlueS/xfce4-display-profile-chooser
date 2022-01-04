@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.1.3
+# Version:    0.1.4
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -22,23 +22,18 @@ function check_connected_displays()	{
 	done
 }
 
-function list_profiles()	{
+function list_profiles() {
 
 	for profiles_id in ${profiles_ids}; do
-		if [[ "${profiles_id}" = 'Default' ]]; then
-			if [[ "${default_profile}" = 'true' ]]; then
-				profile_name='Default '
-			else
-				continue
-			fi
-		elif [[ "${profiles_id}" = 'Fallback' ]]; then
-			if [[ "${fallback_profile}" = 'true' ]]; then
-				profile_name='Fallback '
-			else
-				continue
-			fi
+		if [[ "${profiles_id}" = 'Default' ]] || [[ "${profiles_id}" = 'Fallback' ]]; then
+			profile_name="${profiles_id}"
 		else
-			profile_name="$(echo "${profiles_ids_prop}" | grep "/${profiles_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+			profile_name="$(echo "${profiles_ids_prop}" | grep "/${profiles_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+		fi
+		if [[ "${profiles_id}" = 'Default' ]] && [[ "${default_profile}" != 'true' ]]; then
+			continue
+		elif [[ "${profiles_id}" = 'Fallback' ]] && [[ "${fallback_profile}" != 'true' ]]; then
+			continue
 		fi
 		unset profile_state
 		unset profile_color
@@ -58,14 +53,14 @@ function list_profiles()	{
 			profile_color='1;31'
 		fi
 
-		echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name::-1}${profile_state}\e[0m"
+		echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name}${profile_state}\e[0m"
 		if [[ "${verbose}" = 'true' ]]; then
 			list_profiles_verbose
 		fi
 	done
 }
 
-function list_profiles_verbose()	{
+function list_profiles_verbose() {
 
 	profile_outputs="$(echo "${profiles_ids_prop}" | grep "${profiles_id}" | grep '/EDID ' | awk -F'/' '{print $3}')"
 	for profile_output in ${profile_outputs}; do
@@ -147,34 +142,33 @@ function set_profile() {
 
 	echo
 	unset error
-	if [[ "${profile_id}" = 'Default' ]]; then
-		profile_name='Default '
-	elif [[ "${profile_id}" = 'Fallback' ]]; then
-		profile_name='Fallback '
+	if [[ "${profile_id}" = 'Default' ]] || [[ "${profile_id}" = 'Fallback' ]]; then
+		profile_name="${profile_id}"
 	else
-		profile_name="$(echo "${profiles_ids_prop}" | grep "/${profile_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
-	fi
-	if echo "${active_profile_id}" | grep -xq "${profile_id}"; then
-		echo -e "\e[1;33mProfile ${profile_id} - ${profile_name} was already set\e[0m"
-		error=1
+		profile_name="$(echo "${profiles_ids_prop}" | grep "/${profile_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
 	fi
 
-	exist=0
+	if echo "${active_profile_id}" | grep -xq "${profile_id}"; then
+		echo -e "\e[1;33mProfile ${profile_id} - ${profile_name} was already set\e[0m"
+		error='1'
+	fi
+
+	exist='0'
 	for profiles_id in ${profiles_ids}; do
 		if echo "${profiles_id}" | grep -xq "${profile_id}"; then
-			exist=1
+			exist='1'
 		fi
 	done
 	if [[ "${exist}" = '0' ]]; then
 		echo -e "\e[1;31mProfile id ${profile_id} does not exist\e[0m"
-		error=1
+		error='1'
 	fi
 
 	## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
 	#check_connected_displays "${profile_id}"
 	if [[ "${missing_display}" = '1' ]]; then
 		set_profile_error
-		error=1
+		error='1'
 	fi
 
 	if [[ "${error}" != '1' ]]; then
@@ -223,17 +217,17 @@ function yad_chooser() {
 		profile_choice="${?}"
 		default_profile="$(echo "${profile_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
 		fallback_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
-		if [[ "${profile_choice}" -eq 99 ]]; then
+		if [[ "${profile_choice}" -eq '99' ]]; then
 			exit 0
-		elif [[ "${profile_choice}" -eq 98 ]]; then
+		elif [[ "${profile_choice}" -eq '98' ]]; then
 			yad_help
-		elif [[ "${profile_choice}" -eq 97 ]]; then
+		elif [[ "${profile_choice}" -eq '97' ]]; then
 			yad_verbose
-		elif [[ "${profile_choice}" -eq 96 ]]; then
+		elif [[ "${profile_choice}" -eq '96' ]]; then
 			xfce4-display-settings
-		elif [[ "${profile_choice}" -eq 95 ]]; then
+		elif [[ "${profile_choice}" -eq '95' ]]; then
 			true
-		elif [[ "${profile_choice}" -eq 94 ]]; then
+		elif [[ "${profile_choice}" -eq '94' ]]; then
 			profile="$(echo "${profile_yad}" | awk -F'|' '{print $1}')"
 			profile_id="$(echo "${profiles}" | grep "${profile}" | awk '{print $2}' | awk -F',' '{print $1}')"
 			set_profile
@@ -258,9 +252,9 @@ function yad_help() {
 	help_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "help-about" --width=900 --height=500 --text-info <<<"${info_help}" --button="Exit"!exit!Exit:99 \
 	--button="Go Back"!back!"Go back to profile selection menu":98)"
 	info_choice="${?}"
-	if [ "${info_choice}" -eq 99 ]; then
+	if [[ "${info_choice}" -eq '99' ]]; then
 		exit 0
-	elif [ "${info_choice}" -eq 98 ]; then
+	elif [[ "${info_choice}" -eq '98' ]]; then
 		true
 	else
 		exit 0
@@ -278,11 +272,11 @@ function yad_verbose() {
 		info_choice="${?}"
 		default_profile="$(echo "${verbose_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
 		fallback_profile="$(echo "${verbose_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
-		if [ "${info_choice}" -eq 99 ]; then
+		if [[ "${info_choice}" -eq '99' ]]; then
 			exit 0
-		elif [ "${info_choice}" -eq 98 ]; then
+		elif [[ "${info_choice}" -eq '98' ]]; then
 			true
-		elif [ "${info_choice}" -eq 97 ]; then
+		elif [[ "${info_choice}" -eq '97' ]]; then
 			break
 		else
 			exit 0
@@ -385,6 +379,11 @@ function inizialize() {
 	profiles_ids_prop="$(xfconf-query -v -l -c displays)"
 	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -Ev "(ActiveProfile|IdentityPopups)")"
 	active_profile_id="$(echo "${profiles_ids_prop}" | grep '/ActiveProfile' | awk '{print $2}')"
+	if [[ "${active_profile_id}" = 'Default' ]]; then
+		default_profile='true'
+	elif [[ "${active_profile_id}" = 'Fallback' ]]; then
+		fallback_profile='true'
+	fi
 
 	## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
 	#CONNECTED_EDIDS="$(some command to get current connected displays EDID the same way as seen in xconf-query)"
@@ -395,7 +394,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.1.3
+# Version:    0.1.4
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
