@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.1.1
+# Version:    0.1.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -25,7 +25,21 @@ function check_connected_displays()	{
 function list_profiles()	{
 
 	for profiles_id in ${profiles_ids}; do
-		profile_name="$(echo "${profiles_ids_prop}" | grep "/${profiles_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+		if [[ "${profiles_id}" = 'Default' ]]; then
+			if [[ "${default_profile}" = 'true' ]]; then
+				profile_name='Default '
+			else
+				continue
+			fi
+		elif [[ "${profiles_id}" = 'Fallback' ]]; then
+			if [[ "${fallback_profile}" = 'true' ]]; then
+				profile_name='Fallback '
+			else
+				continue
+			fi
+		else
+			profile_name="$(echo "${profiles_ids_prop}" | grep "/${profiles_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+		fi
 		unset profile_state
 		unset profile_color
 		if echo "${active_profile_id}" | grep -xq "${profiles_id}"; then
@@ -70,28 +84,76 @@ function list_profiles_verbose()	{
 		scale_X="$(echo "${profile_output_prop}" | grep '/Scale/X ' | awk '{print $2}')"
 		scale_Y="$(echo "${profile_output_prop}" | grep '/Scale/Y ' | awk '{print $2}')"
 
-		echo "output=${profile_output}"
-		echo "name=${name}"
-		echo "edid=${edid}"
-		echo "active=${active}"
-		echo "position_X=${position_X}"
-		echo "position_Y=${position_Y}"
-		echo "primary=${primary}"
-		echo "reflection=${reflection}"
-		echo "refreshrate=${refreshrate}"
-		echo "resolution=${resolution}"
-		echo "rotation=${rotation}"
-		echo "scale_X=${scale_X}"
-		echo "scale_Y=${scale_Y}"
+		if [[ -n "${profile_output}" ]]; then
+			echo "output=${profile_output}"
+		fi
+		if [[ -n "${name}" ]]; then
+			echo "name=${name}"
+		fi
+		if [[ -n "${edid}" ]]; then
+			echo "edid=${edid}"
+		fi
+		if [[ -n "${active}" ]]; then
+			echo "active=${active}"
+		fi
+		if [[ -n "${position_X}" ]]; then
+			echo "position_X=${position_X}"
+		fi
+		if [[ -n "${position_Y}" ]]; then
+			echo "position_Y=${position_Y}"
+		fi
+		if [[ -n "${primary}" ]]; then
+			echo "primary=${primary}"
+		fi
+		if [[ -n "${reflection}" ]]; then
+			echo "reflection=${reflection}"
+		fi
+		if [[ -n "${refreshrate}" ]]; then
+			echo "refreshrate=${refreshrate}"
+		fi
+		if [[ -n "${resolution}" ]]; then
+			echo "resolution=${resolution}"
+		fi
+		if [[ -n "${rotation}" ]]; then
+			echo "rotation=${rotation}"
+		fi
+		if [[ -n "${scale_X}" ]]; then
+			echo "scale_X=${scale_X}"
+		fi
+		if [[ -n "${scale_Y}" ]]; then
+			echo "scale_Y=${scale_Y}"
+		fi
 		echo
+
+		unset profile_output
+		unset name
+		unset edid
+		unset active
+		unset position_X
+		unset position_Y
+		unset primary
+		unset reflection
+		unset refreshrate
+		unset resolution
+		unset rotation
+		unset scale_X
+		unset scale_Y
 	done
+	echo -----------------------------------------------------------------
+	echo
 }
 
 function set_profile() {
 
 	echo
 	unset error
-	profile_name="$(echo "${profiles_ids_prop}" | grep "/${profile_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+	if [[ "${profile_id}" = 'Default' ]]; then
+		profile_name='Default '
+	elif [[ "${profile_id}" = 'Fallback' ]]; then
+		profile_name='Fallback '
+	else
+		profile_name="$(echo "${profiles_ids_prop}" | grep "/${profile_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+	fi
 	if echo "${active_profile_id}" | grep -xq "${profile_id}"; then
 		echo -e "\e[1;33mProfile ${profile_id} - ${profile_name} was already set\e[0m"
 		error=1
@@ -128,7 +190,7 @@ function set_profile_error() {
 
 function yad_chooser() {
 
-	ycommopt='--title=xfce4-display-profile-chooser --center --image-on-top --wrap --sticky --on-top --buttons-layout=spread'
+	ycommopt='--always-print-result --title=xfce4-display-profile-chooser --center --image-on-top --wrap --sticky --on-top --buttons-layout=spread'
 
 	yad_check_error
 
@@ -147,13 +209,15 @@ function yad_chooser() {
 
 		active_profile_name="$(echo "${profiles_names}" | grep 'state: active')"
 
-		profile="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --button="Exit"!exit!Exit:99 \
+		profile_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --field="Show Default Profile":chk "${default_profile}" --field="Show Fallback Profile":chk "${fallback_profile}" --button="Exit"!exit!Exit:99 \
 		--button="Help"!help-about!"Show help":98 \
 		--button="Info"!user-info!"Show profiles info":97 \
 		--button="Display"!org.xfce.settings.display!"Open xfce4-display-settings":96 \
 		--button="Refresh"!view-refresh!"Refresh profiles list":95 \
-		--button="Set Profile"!dialog-apply!"Set selected profile":0)"
+		--button="Set Profile"!dialog-apply!"Set selected profile":94)"
 		profile_choice="${?}"
+		default_profile="$(echo "${profile_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
+		fallback_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
 		if [[ "${profile_choice}" -eq 99 ]]; then
 			exit 0
 		elif [[ "${profile_choice}" -eq 98 ]]; then
@@ -164,8 +228,8 @@ function yad_chooser() {
 			xfce4-display-settings
 		elif [[ "${profile_choice}" -eq 95 ]]; then
 			true
-		elif [[ "${profile_choice}" -eq 0 ]]; then
-		profile="$(echo "${profile}" | awk -F'|' '{print $1}')"
+		elif [[ "${profile_choice}" -eq 94 ]]; then
+			profile="$(echo "${profile_yad}" | awk -F'|' '{print $1}')"
 			profile_id="$(echo "${profiles}" | grep "${profile}" | awk '{print $2}' | awk -F',' '{print $1}')"
 			set_profile
 			if [[ "${missing_display}" = '1' ]]; then
@@ -185,9 +249,8 @@ function yad_chooser() {
 
 function yad_help() {
 
-		info="$(givemehelp)"
-		echo "$info" | \
-		yad ${ycommopt} --window-icon "xfce-display-external" --image "help-about" --text="Help" --width=900 --height=500 --text-info --button="Exit"!exit!Exit:99 \
+		info_help="$(givemehelp)"
+		yad ${ycommopt} --window-icon "xfce-display-external" --image "help-about" --width=900 --height=500 --form --field="Help":txt "${info_help}" --button="Exit"!exit!Exit:99 \
 		--button="Go Back"!back!"Go back to profile selection menu":98
 		info_choice="${?}"
 		if [ "${info_choice}" -eq 99 ]; then
@@ -203,12 +266,13 @@ function yad_verbose() {
 
 	while true; do
 		verbose='true'
-		info="$(list_profiles | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
-		echo "$info" | \
-		yad ${ycommopt} --window-icon "xfce-display-external" --image "user-info" --text="Profiles info:" --width=900 --height=500 --text-info --button="Exit"!exit!Exit:99 \
+		info_verbose="$(list_profiles | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+		verbose_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "user-info" --width=900 --height=500 --form --field="Profiles info:":txt "${info_verbose}" --field="Show Default Profile":chk "${default_profile}" --field="Show Fallback Profile":chk "${fallback_profile}" --button="Exit"!exit!Exit:99 \
 		--button="Refresh"!view-refresh!"Refresh profiles info":98 \
-		--button="Go Back"!back!"Go back to profile selection menu":97
+		--button="Go Back"!back!"Go back to profile selection menu":97)"
 		info_choice="${?}"
+		default_profile="$(echo "${verbose_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
+		fallback_profile="$(echo "${verbose_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
 		if [ "${info_choice}" -eq 99 ]; then
 			exit 0
 		elif [ "${info_choice}" -eq 98 ]; then
@@ -314,7 +378,7 @@ function xfce_error() {
 function inizialize() {
 
 	profiles_ids_prop="$(xfconf-query -v -l -c displays)"
-	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -Ev "(ActiveProfile|Default|Fallback|IdentityPopups)")"
+	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -Ev "(ActiveProfile|IdentityPopups)")"
 	active_profile_id="$(echo "${profiles_ids_prop}" | grep '/ActiveProfile' | awk '{print $2}')"
 
 	## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
@@ -326,7 +390,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.1.1
+# Version:    0.1.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -349,10 +413,15 @@ Options:
 -s, --set-profile <profile_id>      Set a profile
 -l, --list-profiles                 Show profiles list
 -v, --list-verbose                  Show profiles list with additional info
+-d, --list-default                  Show default profile in profiles list
+-f, --list-fallback                 Show fallback profile in profiles list
 -g, --gui                           Start a graphical user interface
 -h, --help                          Show this help
 "
 }
+
+default_profile='false'
+fallback_profile='false'
 
 for opt in "$@"; do
 	shift
@@ -360,19 +429,25 @@ for opt in "$@"; do
 		'--set-profile')		set -- "$@" '-s' ;;
 		'--list-profiles')		set -- "$@" '-l' ;;
 		'--list-verbose')		set -- "$@" '-v' ;;
+		'--list-default')		set -- "$@" '-d' ;;
+		'--list-fallback')		set -- "$@" '-f' ;;
 		'--gui')				set -- "$@" '-g' ;;
 		'--help')				set -- "$@" '-h' ;;
 		*)						set -- "$@" "$opt"
 	esac
 done
 
-while getopts "s:lvgh" opt; do
+while getopts "s:lvdfgh" opt; do
 	case ${opt} in
 		s ) profile_id="${OPTARG}"; actions="${actions} set_profile"
 		;;
 		l ) actions="${actions} list_profiles"
 		;;
 		v ) verbose='true'; actions="${actions} list_profiles"
+		;;
+		d ) default_profile='true'; actions="${actions} list_profiles"
+		;;
+		f ) fallback_profile='true'; actions="${actions} list_profiles"
 		;;
 		g ) actions="${actions} yad_chooser"
 		;;
