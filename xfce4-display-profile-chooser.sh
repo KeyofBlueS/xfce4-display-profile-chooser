@@ -255,7 +255,7 @@ function yad_chooser() {
 function yad_help() {
 
 	info_help="$(givemehelp)"
-	help_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "help-about" --width=900 --height=500 --form --field="Help":txt "${info_help}" --button="Exit"!exit!Exit:99 \
+	help_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "help-about" --width=900 --height=500 --text-info <<<"${info_help}" --button="Exit"!exit!Exit:99 \
 	--button="Go Back"!back!"Go back to profile selection menu":98)"
 	info_choice="${?}"
 	if [ "${info_choice}" -eq 99 ]; then
