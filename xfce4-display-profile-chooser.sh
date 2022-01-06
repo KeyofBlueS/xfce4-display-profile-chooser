@@ -36,8 +36,6 @@ function list_profiles() {
 		elif [[ "${profiles_id}" = 'Fallback' ]] && [[ "${fallback_profile}" != 'true' ]]; then
 			continue
 		fi
-		unset profile_state
-		unset profile_color
 		if echo "${active_profile_id}" | grep -xq "${profiles_id}"; then
 			profile_state=', state: active'
 			profile_color='1;32'
@@ -214,6 +212,7 @@ function yad_chooser() {
 
 		active_profile_name="$(echo "${profiles_names}" | grep 'state: active' | awk -F',' '{print $1}')"
 
+		#profile_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current profile: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --field="Show unavailable profiles":chk "${unavailable_profile}" --button="Exit"!exit!Exit:99 
 		profile_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current profile: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --button="Exit"!exit!Exit:99 \
 		--button="Help"!help-about!"Show help":98 \
 		--button="Info"!user-info!"Show profiles info":97 \
@@ -223,6 +222,7 @@ function yad_chooser() {
 		profile_choice="${?}"
 		default_profile="$(echo "${profile_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
 		fallback_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
+		#unavailable_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
 		if [[ "${profile_choice}" -eq '99' ]]; then
 			exit 0
 		elif [[ "${profile_choice}" -eq '98' ]]; then
@@ -271,12 +271,14 @@ function yad_verbose() {
 	while true; do
 		verbose='true'
 		info_verbose="$(list_profiles | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+		#verbose_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --width=900 --height=800 --form --field="Profiles info:":txt "${info_verbose}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --field="Show unavailable profiles":chk "${unavailable_profile}" --button="Exit"!exit!Exit:99 
 		verbose_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --width=900 --height=800 --form --field="Profiles info:":txt "${info_verbose}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --button="Exit"!exit!Exit:99 \
 		--button="Refresh"!view-refresh!"Refresh profiles info":98 \
 		--button="Go back"!back!"Go back to profile selection menu":97)"
 		info_choice="${?}"
 		default_profile="$(echo "${verbose_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
 		fallback_profile="$(echo "${verbose_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
+		#unavailable_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
 		if [[ "${info_choice}" -eq '99' ]]; then
 			exit 0
 		elif [[ "${info_choice}" -eq '98' ]]; then
