@@ -145,20 +145,6 @@ function list_profiles_verbose() {
 		if [[ "${output_done}" != '1' ]]; then
 			echo
 		fi
-
-		unset profile_output
-		unset name
-		unset edid
-		unset active
-		unset position_X
-		unset position_Y
-		unset primary
-		unset reflection
-		unset refreshrate
-		unset resolution
-		unset rotation
-		unset scale_X
-		unset scale_Y
 	done
 	if [[ "${list_done}" != '1' ]]; then
 		echo
