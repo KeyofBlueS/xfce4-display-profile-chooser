@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.1.5
+# Version:    0.1.6
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -24,19 +24,10 @@ function check_connected_displays()	{
 
 function list_profiles() {
 
-
-	if [[ "${verbose}" = 'true' ]]; then
-		list_done='0'
-		profile_current_count='0'
-		profiles_count="$(echo "${profiles_ids}" | wc -l)"
-		if [[ "${default_profile}" != 'true' ]]; then
-			profiles_count="$(("${profiles_count}" - 1))"
-		fi
-		if [[ "${fallback_profile}" != 'true' ]]; then
-			profiles_count="$(("${profiles_count}" - 1))"
-		fi
-	fi
+	first_verbose_call='0'
+	first_profile_item='0'
 	for profiles_id in ${profiles_ids}; do
+		first_profile_item="$(("${first_profile_item}" + 1))"
 		if [[ "${profiles_id}" = 'Default' ]] || [[ "${profiles_id}" = 'Fallback' ]]; then
 			profile_name="${profiles_id}"
 		else
@@ -53,35 +44,41 @@ function list_profiles() {
 			profile_state=', state: active'
 			profile_color='1;32'
 		else
-			#profile_state=', state: available'
-			profile_state=''
-			profile_color='2;32'
-		fi
-
-		## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
-		#check_connected_displays "${profiles_id}"
-		if [[ "${missing_display}" = '1' ]]; then
-			profile_state=', state: not available'
-			profile_color='1;31'
-		fi
-
-		echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name}${profile_state}\e[0m"
-		if [[ "${verbose}" = 'true' ]]; then
-			profile_current_count="$(("${profile_current_count}" + 1))"
-			if [[ "${profile_current_count}" = "${profiles_count}" ]]; then
-				list_done='1'
+			## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
+			#check_connected_displays "${profiles_id}"
+			if [[ "${missing_display}" = '1' ]]; then
+				if [[ "${unavailable_profile}" != 'true' ]]; then
+					continue
+				fi
+				profile_state=', state: not available'
+				profile_color='1;31'
+			else
+				#profile_state=', state: available'
+				profile_state=''
+				profile_color='2;32'
 			fi
+		fi
+
+		if [[ "${verbose}" = 'true' ]]; then
 			list_profiles_verbose
+		else
+			echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name}${profile_state}\e[0m"
 		fi
 	done
 }
 
 function list_profiles_verbose() {
 
+	if [[ "${first_profile_item}" -ge '2' ]] && [[ "${first_verbose_call}" = '1' ]] ; then
+		echo
+		echo '-----------------------------------------------------------------'
+		echo
+	fi
+	first_verbose_call='1'
+
+	echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name}${profile_state}\e[0m"
+
 	profile_outputs="$(echo "${profiles_ids_prop}" | grep "${profiles_id}" | grep '/EDID ' | awk -F'/' '{print $3}')"
-	output_done='0'
-	outputs_current_count='0'
-	outputs_count="$(echo "${profile_outputs}" | wc -l)"
 	for profile_output in ${profile_outputs}; do
 		profile_output_prop="$(echo "${profiles_ids_prop}" | grep "/${profiles_id}/${profile_output}")"
 
@@ -97,6 +94,8 @@ function list_profiles_verbose() {
 		rotation="$(echo "${profile_output_prop}" | grep '/Rotation ' | awk '{print $2}')"
 		scale_x="$(echo "${profile_output_prop}" | grep '/Scale/X ' | awk '{print $2}')"
 		scale_y="$(echo "${profile_output_prop}" | grep '/Scale/Y ' | awk '{print $2}')"
+
+		echo
 
 		if [[ -n "${profile_output}" ]]; then
 			echo "Output=${profile_output}"
@@ -137,20 +136,7 @@ function list_profiles_verbose() {
 		if [[ -n "${scale_y}" ]]; then
 			echo "Scale_Y=${scale_y}"
 		fi
-
-		outputs_current_count="$(("${outputs_current_count}" + 1))"
-		if [[ "${outputs_current_count}" = "${outputs_count}" ]]; then
-			output_done='1'
-		fi
-		if [[ "${output_done}" != '1' ]]; then
-			echo
-		fi
 	done
-	if [[ "${list_done}" != '1' ]]; then
-		echo
-		echo '-----------------------------------------------------------------'
-		echo
-	fi
 }
 
 function set_profile() {
@@ -408,7 +394,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.1.5
+# Version:    0.1.6
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -440,6 +426,7 @@ Options:
 
 default_profile='false'
 fallback_profile='false'
+unavailable_profile='false'
 
 for opt in "$@"; do
 	shift
@@ -449,13 +436,14 @@ for opt in "$@"; do
 		'--list-verbose')		set -- "$@" '-v' ;;
 		'--list-default')		set -- "$@" '-d' ;;
 		'--list-fallback')		set -- "$@" '-f' ;;
+		'--list-unavailable')	set -- "$@" '-u' ;;
 		'--gui')				set -- "$@" '-g' ;;
 		'--help')				set -- "$@" '-h' ;;
 		*)						set -- "$@" "$opt"
 	esac
 done
 
-while getopts "s:lvdfgh" opt; do
+while getopts "s:lvdfugh" opt; do
 	case ${opt} in
 		s ) profile_id="${OPTARG}"; actions="${actions} set_profile"
 		;;
@@ -466,6 +454,8 @@ while getopts "s:lvdfgh" opt; do
 		d ) default_profile='true'; actions="${actions} list_profiles"
 		;;
 		f ) fallback_profile='true'; actions="${actions} list_profiles"
+		;;
+		u ) unavailable_profile='true'; actions="${actions} list_profiles"
 		;;
 		g ) actions="${actions} yad_chooser"
 		;;
