@@ -24,10 +24,8 @@ function check_connected_displays()	{
 
 function list_profiles() {
 
-	first_verbose_call='0'
 	first_profile_item='0'
 	for profiles_id in ${profiles_ids}; do
-		first_profile_item="$(("${first_profile_item}" + 1))"
 		if [[ "${profiles_id}" = 'Default' ]] || [[ "${profiles_id}" = 'Fallback' ]]; then
 			profile_name="${profiles_id}"
 		else
@@ -60,6 +58,7 @@ function list_profiles() {
 		fi
 
 		if [[ "${verbose}" = 'true' ]]; then
+			first_profile_item="$(("${first_profile_item}" + 1))"
 			list_profiles_verbose
 		else
 			echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name}${profile_state}\e[0m"
@@ -69,12 +68,11 @@ function list_profiles() {
 
 function list_profiles_verbose() {
 
-	if [[ "${first_profile_item}" -ge '2' ]] && [[ "${first_verbose_call}" = '1' ]] ; then
+	if [[ "${first_profile_item}" -ge '2' ]]; then
 		echo
 		echo '-----------------------------------------------------------------'
 		echo
 	fi
-	first_verbose_call='1'
 
 	echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name}${profile_state}\e[0m"
 
@@ -141,7 +139,13 @@ function list_profiles_verbose() {
 
 function set_profile() {
 
-	echo
+	if echo "${actions}" | grep -q 'list_profiles'; then
+		echo
+		if [[ "${verbose}" = 'true' ]]; then
+			echo '-----------------------------------------------------------------'
+			echo
+		fi
+	fi
 	unset error
 	if [[ "${profile_id}" = 'Default' ]] || [[ "${profile_id}" = 'Fallback' ]]; then
 		profile_name="${profile_id}"
@@ -307,7 +311,7 @@ function yad_check_error() {
 
 function yad_show_error() {
 
-	error_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "dialog-error" --text="Dependancies error:" --width=900 --height=200 --text-info <<<"${error_text}" --button="Exit"!exit!Exit:99)"
+	error_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "dialog-error" --text="Error:" --width=900 --height=200 --text-info <<<"${error_text}" --button="Exit"!exit!Exit:99)"
 }
 
 function check_dependencies() {
@@ -351,13 +355,14 @@ function dependencies_error() {
 	if [[ "${commline_error}" = '1' ]]; then
 		echo -e "\e[1;31mERROR: This script require \e[1;34m${missing}\e[1;31m. Use e.g. \e[1;34msudo apt-get install ${missing}"
 		echo -e "\e[1;31mInstall the requested dependencies and restart this script.\e[0m"
-		echo
+		if [[ "${gui_error}" = '1' ]]; then
+			echo
+		fi
 	fi
 
 	if [[ "${gui_error}" = '1' ]]; then
 		echo -e "\e[1;33mWARNING: This script require \e[1;34m${missing}\e[1;33m for the GUI. Use e.g. \e[1;34msudo apt-get install ${missing}"
 		echo -e "\e[1;33mInstall the requested dependencies and restart this script.\e[0m"
-		echo
 	fi
 }
 
