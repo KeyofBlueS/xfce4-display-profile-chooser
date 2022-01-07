@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.1.6
+# Version:    0.1.7
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -36,7 +36,7 @@ function list_profiles() {
 		elif [[ "${profiles_id}" = 'Fallback' ]] && [[ "${fallback_profile}" != 'true' ]]; then
 			continue
 		fi
-		if echo "${active_profile_id}" | grep -xq "${profiles_id}"; then
+		if [[ "${active_profile_id}" = "${profiles_id}" ]]; then
 			profile_state=', state: active'
 			profile_color='1;32'
 		else
@@ -54,7 +54,6 @@ function list_profiles() {
 				profile_color='2;32'
 			fi
 		fi
-
 		if [[ "${verbose}" = 'true' ]]; then
 			first_profile_item="$(("${first_profile_item}" + 1))"
 			list_profiles_verbose
@@ -151,7 +150,7 @@ function set_profile() {
 		profile_name="$(echo "${profiles_ids_prop}" | grep "/${profile_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
 	fi
 
-	if echo "${active_profile_id}" | grep -xq "${profile_id}"; then
+	if [[ "${active_profile_id}" = "${profile_id}" ]]; then
 		echo -e "\e[1;33mProfile ${profile_id} - ${profile_name} was already set\e[0m"
 		error='1'
 	fi
@@ -240,9 +239,6 @@ function yad_chooser() {
 			if [[ "${missing_display}" = '1' ]]; then
 				error_text="$(set_profile_error | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
 				yad_show_error
-			fi
-			if [[ "${error}" != '1' ]]; then
-				sleep 1.5
 			fi
 		else
 			exit 0
@@ -384,7 +380,7 @@ function xfce_error() {
 function inizialize() {
 
 	profiles_ids_prop="$(xfconf-query -v -l -c displays)"
-	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -Ev "(ActiveProfile|IdentityPopups)")"
+	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -Ev "(ActiveProfile|Schemes|IdentityPopups)")"
 	active_profile_id="$(echo "${profiles_ids_prop}" | grep '/ActiveProfile' | awk '{print $2}')"
 	if [[ "${active_profile_id}" = 'Default' ]]; then
 		default_profile='true'
@@ -401,7 +397,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.1.6
+# Version:    0.1.7
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -478,6 +474,7 @@ then
 fi
 
 if echo "${actions}" | grep -q 'yad_chooser'; then
+	unset actions
 	yad_chooser
 	exit 0
 fi
