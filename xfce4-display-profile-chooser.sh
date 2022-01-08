@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.1.7
+# Version:    0.1.8
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -90,48 +90,104 @@ function list_profiles_verbose() {
 		scale_x="$(echo "${profile_output_prop}" | grep '/Scale/X ' | awk '{print $2}')"
 		scale_y="$(echo "${profile_output_prop}" | grep '/Scale/Y ' | awk '{print $2}')"
 
-		echo
+		unset xrandr_output
+		unset xrandr_active
+		unset xrandr_primary
+		unset xrandr_resolution
+		unset xrandr_refreshrate
+		unset xrandr_position
+		unset xrandr_rotation
+		unset xrandr_reflection
+		unset xrandr_scale
 
-		if [[ -n "${profile_output}" ]]; then
-			echo "Output=${profile_output}"
-		fi
-		if [[ -n "${name}" ]]; then
-			echo "Name=${name}"
-		fi
-		if [[ -n "${edid}" ]]; then
-			echo "EDID=${edid}"
-		fi
-		if [[ -n "${active}" ]]; then
-			echo "Active=${active}"
+		echo
+		echo "Output=${profile_output}"
+		xrandr_output="--output ${profile_output}"
+		echo "Name=${name}"
+		echo "EDID=${edid}"
+		echo "Active=${active}"
+		if [[ "${active}" = 'false' ]]; then
+			xrandr_active='--off'
 		fi
 		if [[ -n "${position_x}" ]]; then
 			echo "Position_X=${position_x}"
+			xrandr_position="${position_x}"
 		fi
 		if [[ -n "${position_y}" ]]; then
 			echo "Position_Y=${position_y}"
+			xrandr_position="--pos ${xrandr_position}x${position_y}"
 		fi
 		if [[ -n "${primary}" ]]; then
 			echo "Primary=${primary}"
+			if [[ "${primary}" = 'true' ]]; then
+				xrandr_primary='--primary'
+			fi
 		fi
 		if [[ -n "${reflection}" ]]; then
 			echo "Reflection=${reflection}"
+			if [[ "${reflection}" = '0' ]]; then
+				xrandr_reflection="--reflect normal"
+			else
+				xrandr_reflection="--reflect ${reflection,,}"
+			fi
 		fi
 		if [[ -n "${refreshrate}" ]]; then
 			echo "RefreshRate=${refreshrate}"
+			xrandr_refreshrate="--rate ${refreshrate}"
 		fi
 		if [[ -n "${resolution}" ]]; then
 			echo "Resolution=${resolution}"
+			xrandr_resolution="--mode ${resolution}"
 		fi
 		if [[ -n "${rotation}" ]]; then
 			echo "Rotation=${rotation}"
+			if [[ "${rotation}" = '0' ]]; then
+				xrandr_rotation="--rotate normal"
+			elif [[ "${rotation}" = '90' ]]; then
+				xrandr_rotation="--rotate left"
+			elif [[ "${rotation}" = '180' ]]; then
+				xrandr_rotation="--rotate inverted"
+			elif [[ "${rotation}" = '270' ]]; then
+				xrandr_rotation="--rotate right"
+			fi
 		fi
 		if [[ -n "${scale_x}" ]]; then
 			echo "Scale_X=${scale_x}"
+			xrandr_scale="${scale_x//,/$'.'}"
 		fi
 		if [[ -n "${scale_y}" ]]; then
 			echo "Scale_Y=${scale_y}"
+			xrandr_scale="--scale ${xrandr_scale}x${scale_y//,/$'.'}"
 		fi
+
+		xrandr_opts="$(xrandr_options)"
+		while IFS= read -r xrandr_opt; do
+			xrandr_command="${xrandr_command} ${xrandr_opt}"
+		done <<< "${xrandr_opts}"
+
 	done
+	echo
+	echo 'xrand command to set this profile:'
+	echo "xrandr${xrandr_command}"
+	unset xrandr_command
+}
+
+function xrandr_options() {
+
+	echo "${xrandr_output}"
+	if [[ -n "${xrandr_active}" ]]; then
+		echo "${xrandr_active}"
+	else
+		if [[ -n "${xrandr_primary}" ]]; then
+			echo "${xrandr_primary}"
+		fi
+		echo "${xrandr_resolution}"
+		echo "${xrandr_refreshrate}"
+		echo "${xrandr_position}"
+		echo "${xrandr_rotation}"
+		echo "${xrandr_reflection}"
+		echo "${xrandr_scale}"
+	fi
 }
 
 function set_profile() {
@@ -266,6 +322,7 @@ function yad_verbose() {
 
 	while true; do
 		verbose='true'
+		inizialize
 		info_verbose="$(list_profiles | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
 		#verbose_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --width=900 --height=800 --form --field="Profiles info:":txt "${info_verbose}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --field="Show unavailable profiles":chk "${unavailable_profile}" --button="Exit"!exit!Exit:99 
 		verbose_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --width=900 --height=800 --form --field="Profiles info:":txt "${info_verbose}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --button="Exit"!exit!Exit:99 \
@@ -397,7 +454,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.1.7
+# Version:    0.1.8
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
