@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.1.8
+# Version:    0.2.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -22,23 +22,35 @@ function check_connected_displays()	{
 	done
 }
 
+function get_profile_name() {
+
+	get_name="${1}"
+	if [[ "${get_name}" = 'Default' || "${get_name}" = 'Fallback' ]]; then
+		echo "${get_name}"
+	else
+		echo "${profiles_ids_prop}" | grep "/${get_name}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g"
+	fi
+}
+
 function list_profiles() {
 
 	first_profile_item='0'
 	for profiles_id in ${profiles_ids}; do
-		if [[ "${profiles_id}" = 'Default' ]] || [[ "${profiles_id}" = 'Fallback' ]]; then
-			profile_name="${profiles_id}"
-		else
-			profile_name="$(echo "${profiles_ids_prop}" | grep "/${profiles_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
-		fi
+		profile_name="$(get_profile_name "${profiles_id}")"
 		if [[ "${profiles_id}" = 'Default' ]] && [[ "${default_profile}" != 'true' ]]; then
 			continue
 		elif [[ "${profiles_id}" = 'Fallback' ]] && [[ "${fallback_profile}" != 'true' ]]; then
 			continue
 		fi
 		if [[ "${active_profile_id}" = "${profiles_id}" ]]; then
-			profile_state=', state: active'
-			profile_color='1;32'
+			list_verbose_profiles "${profiles_id}" check_active
+			if [[ "${active_profile_state}" != '1' ]]; then
+				profile_state=', state: set; active'
+				profile_color='1;32'
+			else
+				profile_state=', state: set; not active'
+				profile_color='1;33'
+			fi
 		else
 			## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
 			#check_connected_displays "${profiles_id}"
@@ -56,26 +68,33 @@ function list_profiles() {
 		fi
 		if [[ "${verbose}" = 'true' ]]; then
 			first_profile_item="$(("${first_profile_item}" + 1))"
-			list_profiles_verbose
+			list_verbose_profiles "${profiles_id}" show_verbose
 		else
 			echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name}${profile_state}\e[0m"
 		fi
 	done
 }
 
-function list_profiles_verbose() {
+function list_verbose_profiles() {
 
-	if [[ "${first_profile_item}" -ge '2' ]]; then
-		echo
-		echo '-----------------------------------------------------------------'
-		echo
+	get_verbose="${1}"
+	action_verbose="${2}"
+
+	if [[ "${action_verbose}" = 'show_verbose' ]]; then
+		if [[ "${first_profile_item}" -ge '2' ]]; then
+			echo
+			echo '-----------------------------------------------------------------'
+			echo
+		fi
+		echo -e "\e[${profile_color}mid: ${get_verbose}, name: ${profile_name}${profile_state}\e[0m"
+	elif [[ "${action_verbose}" = 'check_active' ]]; then
+		xrandr_prop="$(xrandr)"
+		active_profile_state='0'
 	fi
 
-	echo -e "\e[${profile_color}mid: ${profiles_id}, name: ${profile_name}${profile_state}\e[0m"
-
-	profile_outputs="$(echo "${profiles_ids_prop}" | grep "${profiles_id}" | grep '/EDID ' | awk -F'/' '{print $3}')"
+	profile_outputs="$(echo "${profiles_ids_prop}" | grep "${get_verbose}" | grep '/EDID ' | awk -F'/' '{print $3}')"
 	for profile_output in ${profile_outputs}; do
-		profile_output_prop="$(echo "${profiles_ids_prop}" | grep "/${profiles_id}/${profile_output}")"
+		profile_output_prop="$(echo "${profiles_ids_prop}" | grep "/${get_verbose}/${profile_output}")"
 
 		name="$(echo "${profile_output_prop}" | grep "${profile_output} " | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//')"
 		edid="$(echo "${profile_output_prop}" | grep '/EDID ' | awk '{print $2}')"
@@ -90,103 +109,178 @@ function list_profiles_verbose() {
 		scale_x="$(echo "${profile_output_prop}" | grep '/Scale/X ' | awk '{print $2}')"
 		scale_y="$(echo "${profile_output_prop}" | grep '/Scale/Y ' | awk '{print $2}')"
 
-		unset xrandr_output
-		unset xrandr_active
-		unset xrandr_primary
-		unset xrandr_resolution
-		unset xrandr_refreshrate
-		unset xrandr_position
-		unset xrandr_rotation
-		unset xrandr_reflection
-		unset xrandr_scale
+		if [[ "${action_verbose}" = 'show_verbose' ]]; then
+			show_verbose_profiles
+		elif [[ "${action_verbose}" = 'check_active' ]]; then
+			check_active_profile
+			if [[ "${active_profile_state}" = '1' ]]; then
+				break
+			fi
+		fi
+	done
+	if [[ "${action_verbose}" = 'show_verbose' ]]; then
+		echo
+		echo 'xrand command to set this profile:'
+		echo "xrandr${xrandr_command}"
+		unset xrandr_command
+	fi
+	unset action_verbose
+}
+
+function show_verbose_profiles() {
 
 		echo
 		echo "Output=${profile_output}"
-		xrandr_output="--output ${profile_output}"
 		echo "Name=${name}"
 		echo "EDID=${edid}"
 		echo "Active=${active}"
-		if [[ "${active}" = 'false' ]]; then
-			xrandr_active='--off'
-		fi
-		if [[ -n "${position_x}" ]]; then
+		if [[ "${active}" = 'true' || "${get_verbose}" = 'Default' || "${get_verbose}" = 'Fallback' ]]; then
 			echo "Position_X=${position_x}"
-			xrandr_position="${position_x}"
-		fi
-		if [[ -n "${position_y}" ]]; then
 			echo "Position_Y=${position_y}"
-			xrandr_position="--pos ${xrandr_position}x${position_y}"
-		fi
-		if [[ -n "${primary}" ]]; then
 			echo "Primary=${primary}"
-			if [[ "${primary}" = 'true' ]]; then
-				xrandr_primary='--primary'
-			fi
-		fi
-		if [[ -n "${reflection}" ]]; then
 			echo "Reflection=${reflection}"
-			if [[ "${reflection}" = '0' ]]; then
-				xrandr_reflection="--reflect normal"
-			else
-				xrandr_reflection="--reflect ${reflection,,}"
-			fi
-		fi
-		if [[ -n "${refreshrate}" ]]; then
 			echo "RefreshRate=${refreshrate}"
-			xrandr_refreshrate="--rate ${refreshrate}"
-		fi
-		if [[ -n "${resolution}" ]]; then
 			echo "Resolution=${resolution}"
-			xrandr_resolution="--mode ${resolution}"
-		fi
-		if [[ -n "${rotation}" ]]; then
 			echo "Rotation=${rotation}"
-			if [[ "${rotation}" = '0' ]]; then
-				xrandr_rotation="--rotate normal"
-			elif [[ "${rotation}" = '90' ]]; then
-				xrandr_rotation="--rotate left"
-			elif [[ "${rotation}" = '180' ]]; then
-				xrandr_rotation="--rotate inverted"
-			elif [[ "${rotation}" = '270' ]]; then
-				xrandr_rotation="--rotate right"
-			fi
-		fi
-		if [[ -n "${scale_x}" ]]; then
 			echo "Scale_X=${scale_x}"
-			xrandr_scale="${scale_x//,/$'.'}"
-		fi
-		if [[ -n "${scale_y}" ]]; then
 			echo "Scale_Y=${scale_y}"
-			xrandr_scale="--scale ${xrandr_scale}x${scale_y//,/$'.'}"
 		fi
 
-		xrandr_opts="$(xrandr_options)"
 		while IFS= read -r xrandr_opt; do
 			xrandr_command="${xrandr_command} ${xrandr_opt}"
-		done <<< "${xrandr_opts}"
-
-	done
-	echo
-	echo 'xrand command to set this profile:'
-	echo "xrandr${xrandr_command}"
-	unset xrandr_command
+		done <<< "$(xrandr_options)"
 }
 
 function xrandr_options() {
 
-	echo "${xrandr_output}"
+	get_xrandr_variables
+
+	echo "--output ${xrandr_output}"
 	if [[ -n "${xrandr_active}" ]]; then
-		echo "${xrandr_active}"
+		echo "--off"
 	else
 		if [[ -n "${xrandr_primary}" ]]; then
-			echo "${xrandr_primary}"
+			echo "--primary"
 		fi
-		echo "${xrandr_resolution}"
-		echo "${xrandr_refreshrate}"
-		echo "${xrandr_position}"
-		echo "${xrandr_rotation}"
-		echo "${xrandr_reflection}"
-		echo "${xrandr_scale}"
+		echo "--mode ${xrandr_resolution}"
+		echo "--rate ${xrandr_refreshrate}"
+		echo "--pos ${xrandr_position_x}x${xrandr_position_y}"
+		echo "--rotate ${xrandr_rotation}"
+		echo "--reflect ${xrandr_reflection}"
+		echo "--scale ${xrandr_scale_x}x${xrandr_scale_y}"
+	fi
+}
+
+function get_xrandr_variables() {
+
+	unset xrandr_output
+	unset xrandr_active
+	unset xrandr_primary
+	unset xrandr_resolution
+	unset xrandr_refreshrate
+	unset xrandr_position
+	unset xrandr_rotation
+	unset xrandr_reflection
+	unset xrandr_scale
+
+	xrandr_output="${profile_output}"
+	if [[ "${active}" = 'false' ]]; then
+		xrandr_active='connected'
+	fi
+	if [[ -n "${position_x}" ]]; then
+		xrandr_position_x="${position_x}"
+	fi
+	if [[ -n "${position_y}" ]]; then
+		xrandr_position_y="${position_y}"
+	fi
+	if [[ -n "${primary}" ]]; then
+		if [[ "${primary}" = 'true' ]]; then
+			xrandr_primary='primary'
+		fi
+	fi
+	if [[ -n "${reflection}" ]]; then
+		if [[ "${reflection}" = '0' ]]; then
+			xrandr_reflection="normal"
+		else
+			xrandr_reflection="${reflection,,}"
+		fi
+	fi
+	if [[ -n "${refreshrate}" ]]; then
+		xrandr_refreshrate="${refreshrate}"
+	fi
+	if [[ -n "${resolution}" ]]; then
+		xrandr_resolution="${resolution}"
+	fi
+	if [[ -n "${rotation}" ]]; then
+		if [[ "${rotation}" = '0' ]]; then
+			xrandr_rotation="normal"
+		elif [[ "${rotation}" = '90' ]]; then
+			xrandr_rotation="left"
+		elif [[ "${rotation}" = '180' ]]; then
+			xrandr_rotation="inverted"
+		elif [[ "${rotation}" = '270' ]]; then
+			xrandr_rotation="right"
+		fi
+	fi
+	if [[ -n "${scale_x}" ]]; then
+		xrandr_scale_x="${scale_x//,/$'.'}"
+	fi
+	if [[ -n "${scale_y}" ]]; then
+		xrandr_scale_y="${scale_y//,/$'.'}"
+	fi
+}
+
+function check_active_profile() {
+
+	get_xrandr_variables
+	if [[ "${xrandr_active}" = 'connected' ]]; then
+		xrandr_grep="${xrandr_output} ${xrandr_active}"
+		if ! echo "${xrandr_prop}" | grep -q "${xrandr_grep} ("; then
+			active_profile_state='1'
+		fi
+	else
+		if [[ -n "${xrandr_primary}" ]]; then
+			xrandr_primary_state="${xrandr_primary}"
+		fi
+		if [[ "${xrandr_rotation}" = 'left' || "${xrandr_rotation}" = 'right' ]]; then
+			xrandr_resolution_state="$(echo "${resolution}" | awk -F'x' '{print $2}')x$(echo "${resolution}" | awk -F'x' '{print $1}')"
+		else
+			xrandr_resolution_state="${resolution}"
+		fi
+		xrandr_resolution_state="$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $1}')" * "${xrandr_scale_x}"")x$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $2}')" * "${xrandr_scale_y}"")"
+		xrandr_position_state="${xrandr_position_x}+${xrandr_position_y}"
+		if [[ "${xrandr_rotation}" != 'normal' ]]; then
+			xrandr_rotation_state="${xrandr_rotation}"
+		fi
+		if [[ "${xrandr_reflection}" != 'normal' ]]; then
+			if [[ "${xrandr_reflection}" = 'x' || "${xrandr_reflection}" = 'y' ]]; then
+				xrandr_reflection_state="${xrandr_reflection^^} axis"
+			elif [[ "${xrandr_reflection}" = 'xy' ]]; then
+				xrandr_reflection_state="X and Y axis"
+			fi
+		fi
+		xrandr_refreshrate_state="${xrandr_refreshrate::-4}"
+		xrandr_refreshrate_state="${xrandr_refreshrate_state//,/$'.'}"
+
+		unset xrandr_grep
+		for xrandr_state in ${xrandr_output} connected ${xrandr_primary_state} ${xrandr_resolution_state}+${xrandr_position_state} ${xrandr_rotation_state} ${xrandr_reflection_state}; do
+			if [[ -z "${xrandr_grep}" ]]; then
+				xrandr_grep="${xrandr_state}"
+			else
+				xrandr_grep="${xrandr_grep} ${xrandr_state}"
+			fi
+		done
+
+		export xrandr_prop
+		export xrandr_output
+		xrandr_output_prop="$(perl -E '$_ = qx/echo "$ENV{xrandr_prop}"/; for (split /^(?!\s)/sm) { chomp; say if /^\S*$ENV{xrandr_output} /; }')"
+		if ! echo "${xrandr_output_prop}" | grep -q "${xrandr_grep} ("; then
+			active_profile_state='1'
+		else
+			if ! echo "${xrandr_output_prop}" | grep -q " ${xrandr_refreshrate_state}\*"; then
+				active_profile_state='1'
+			fi
+		fi
 	fi
 }
 
@@ -200,15 +294,14 @@ function set_profile() {
 		fi
 	fi
 	unset error
-	if [[ "${profile_id}" = 'Default' ]] || [[ "${profile_id}" = 'Fallback' ]]; then
-		profile_name="${profile_id}"
-	else
-		profile_name="$(echo "${profiles_ids_prop}" | grep "/${profile_id}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
-	fi
+	profile_name="$(get_profile_name "${profile_id}")"
 
 	if [[ "${active_profile_id}" = "${profile_id}" ]]; then
-		echo -e "\e[1;33mProfile ${profile_id} - ${profile_name} was already set\e[0m"
-		error='1'
+		list_verbose_profiles "${profile_id}" check_active
+		if [[ "${active_profile_state}" != '1' ]]; then
+			echo -e "\e[1;33mProfile ${profile_id} - ${profile_name} is already active\e[0m"
+			error='1'
+		fi
 	fi
 
 	exist='0'
@@ -265,7 +358,7 @@ function yad_chooser() {
 			fi
 		done <<< "${profiles_names}"
 
-		active_profile_name="$(echo "${profiles_names}" | grep 'state: active' | awk -F',' '{print $1}')"
+		active_profile_name="$(echo "${profiles_names}" | grep 'state: set')"
 
 		#profile_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current profile: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --field="Show unavailable profiles":chk "${unavailable_profile}" --button="Exit"!exit!Exit:99 
 		profile_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current profile: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --button="Exit"!exit!Exit:99 \
@@ -277,7 +370,7 @@ function yad_chooser() {
 		profile_choice="${?}"
 		default_profile="$(echo "${profile_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
 		fallback_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
-		#unavailable_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
+		#unavailable_profile="$(echo "${profile_yad}" | awk -F'|' '{print $4}' | tr '[:upper:]' '[:lower:]')"
 		if [[ "${profile_choice}" -eq '99' ]]; then
 			exit 0
 		elif [[ "${profile_choice}" -eq '98' ]]; then
@@ -371,7 +464,7 @@ function yad_show_error() {
 
 function check_dependencies() {
 
-	commline_bins='xfconf-query awk cat grep'
+	commline_bins='xfconf-query xrandr perl awk cat grep'
 	gui_bins='yad xfce4-display-settings wmctrl'
 	for bin in ${commline_bins} ${gui_bins}; do
 		if ! command -v "${bin}" &>/dev/null; then
@@ -454,7 +547,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.1.8
+# Version:    0.2.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
