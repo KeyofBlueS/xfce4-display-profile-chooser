@@ -1,14 +1,14 @@
 # xfce4-display-profile-chooser
 
-# Version:    0.2.0
+# Version:    0.2.1
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
 
 ### DESCRIPTION
-With this bash script you can, via command line, list and set already configured display profiles in xfce4-display-settings.
-This is useful if you want e.g. to automate stuff by setting profiles with a script or to use a keyboard shortcut.
-A graphical user interface is provided with the use of yad.
+With this bash script you can, via command line, list, set and remove already configured display profiles in xfce4-display-settings.
+This is useful if you want e.g. to automate stuff by setting profiles within a script or to use a keyboard shortcut.
+A graphical user interface is provided with yad.
 
 ### TODO
 Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
@@ -34,6 +34,7 @@ Options:
 -v, --list-verbose                  Show profiles list with additional info
 -d, --list-default                  Show Default profile in profiles list
 -f, --list-fallback                 Show Fallback profile in profiles list
+-r, --remove-profile <profile_id>   Remove a profile
 -g, --gui                           Start with a graphical user interface
 -h, --help                          Show this help
 ```
