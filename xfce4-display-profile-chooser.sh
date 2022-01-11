@@ -2,21 +2,21 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.2.2
+# Version:    0.3.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
 
-function check_connected_displays()	{
+function check_connected_edid()	{
 
 	## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
 	profile_id_check="${1}"
-	missing_display='0'
+	missing_edid='0'
 	profile_edids="$(echo "${profiles_ids_prop}" | grep "${profile_id_check}" | grep '/EDID ' | awk '{print $2}')"
 	for profile_edid in ${profile_edids}; do
 		for connected_edid in ${connected_edids}; do
 			if ! echo "${connected_edid}" | grep -xq "${profile_edid}"; then
-				missing_display='1'
+				missing_edid='1'
 			fi
 		done
 	done
@@ -53,8 +53,8 @@ function list_profiles() {
 			fi
 		else
 			## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
-			#check_connected_displays "${profiles_id}"
-			if [[ "${missing_display}" = '1' ]]; then
+			#check_connected_edid "${profiles_id}"
+			if [[ "${missing_edid}" = '1' ]]; then
 				if [[ "${unavailable_profile}" != 'true' ]]; then
 					continue
 				fi
@@ -90,6 +90,10 @@ function list_verbose_profiles() {
 	elif [[ "${action_verbose}" = 'check_active' ]]; then
 		xrandr_prop="$(xrandr)"
 		active_profile_state='0'
+	elif [[ "${action_verbose}" = 'check_connected_supported' ]]; then
+		xrandr_prop="$(xrandr)"
+		not_connected_supported='0'
+		unset error_message
 	fi
 
 	profile_outputs="$(echo "${profiles_ids_prop}" | grep "${get_verbose}" | grep '/EDID ' | awk -F'/' '{print $3}')"
@@ -118,6 +122,8 @@ function list_verbose_profiles() {
 			if [[ "${active_profile_state}" = '1' ]]; then
 				break
 			fi
+		elif [[ "${action_verbose}" = 'check_connected_supported' ]]; then
+			check_connected_supported_display
 		fi
 	done
 	if [[ "${action_verbose}" = 'show_verbose' ]]; then
@@ -127,6 +133,7 @@ function list_verbose_profiles() {
 		unset xrandr_command
 	fi
 	unset action_verbose
+	unset action_supported
 }
 
 function show_verbose_profiles() {
@@ -158,10 +165,10 @@ function xrandr_options() {
 	get_xrandr_variables
 
 	echo "--output ${xrandr_output}"
-	if [[ -n "${xrandr_active}" ]]; then
+	if [[ "${xrandr_active}" = 'false' ]]; then
 		echo "--off"
 	else
-		if [[ -n "${xrandr_primary}" ]]; then
+		if [[ "${xrandr_primary}" = 'primary' ]]; then
 			echo "--primary"
 		fi
 		echo "--mode ${xrandr_resolution}"
@@ -186,10 +193,8 @@ function get_xrandr_variables() {
 	unset xrandr_scale
 
 	xrandr_output="${profile_output}"
-	if [[ "${active}" = 'false' ]]; then
-		xrandr_active='connected'
-	fi
-	if [[ "${active}" = 'true' || "${get_verbose}" = 'Default' || "${get_verbose}" = 'Fallback' ]]; then
+	xrandr_active="${active}"
+	if [[ "${xrandr_active}" = 'true' || "${get_verbose}" = 'Default' || "${get_verbose}" = 'Fallback' ]]; then
 		if [[ -n "${position_x}" ]]; then
 			xrandr_position_x="${position_x}"
 		fi
@@ -237,13 +242,17 @@ function get_xrandr_variables() {
 function check_active_profile() {
 
 	get_xrandr_variables
-	if [[ "${xrandr_active}" = 'connected' ]]; then
-		xrandr_grep="${xrandr_output} ${xrandr_active}"
-		if ! echo "${xrandr_prop}" | grep -q "${xrandr_grep} ("; then
-			active_profile_state='1'
-		fi
-	else
-		if [[ -n "${xrandr_primary}" ]]; then
+
+	if [[ "${xrandr_active}" = 'true' || "${get_verbose}" = 'Default' || "${get_verbose}" = 'Fallback' ]]; then
+
+		unset xrandr_primary_state
+		unset xrandr_resolution_state
+		unset xrandr_position_state
+		unset xrandr_rotation_state
+		unset xrandr_reflection_state
+		unset xrandr_refreshrate_state
+
+		if [[ "${xrandr_primary}" = 'primary' ]]; then
 			xrandr_primary_state="${xrandr_primary}"
 		fi
 		if [[ "${xrandr_rotation}" = 'left' || "${xrandr_rotation}" = 'right' ]]; then
@@ -265,7 +274,7 @@ function check_active_profile() {
 				xrandr_reflection_state="X and Y axis"
 			fi
 		fi
-		xrandr_refreshrate_state="${xrandr_refreshrate::-4}"
+		xrandr_refreshrate_state="$(echo "${xrandr_refreshrate}" | awk -F',' '{print $1}')"
 		xrandr_refreshrate_state="${xrandr_refreshrate_state//,/$'.'}"
 
 		unset xrandr_grep
@@ -283,8 +292,38 @@ function check_active_profile() {
 		if ! echo "${xrandr_output_prop}" | grep -q "${xrandr_grep} ("; then
 			active_profile_state='1'
 		else
-			if ! echo "${xrandr_output_prop}" | grep -q " ${xrandr_refreshrate_state}\*"; then
+			if ! echo "${xrandr_output_prop}" | grep -Eq " +${xrandr_refreshrate_state}\.[[:digit:]]+\*"; then
 				active_profile_state='1'
+			fi
+		fi
+	fi
+}
+
+function check_connected_supported_display() {
+
+	get_xrandr_variables
+
+	if [[ "${xrandr_active}" = 'true' ]]; then
+		if echo "${xrandr_prop}" | grep -q "${xrandr_output} connected"; then
+			export xrandr_prop
+			export xrandr_output
+			xrandr_output_prop="$(perl -E '$_ = qx/echo "$ENV{xrandr_prop}"/; for (split /^(?!\s)/sm) { chomp; say if /^\S*$ENV{xrandr_output} /; }')"
+			xrandr_refreshrate_connected="$(echo "${xrandr_refreshrate}" | awk -F',' '{print $1}')"
+			xrandr_refreshrate_connected="${xrandr_refreshrate_connected//,/$'.'}"
+			if ! echo "${xrandr_output_prop}" | grep -E "^ +${resolution}" | grep -Eq " +${xrandr_refreshrate_connected}\.[[:digit:]]+"; then
+				not_connected_supported='1'
+				if [[ -z "${error_message}" ]]; then
+					error_message="$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
+				else
+					error_message="${error_message}\n$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
+				fi
+			fi
+		else
+			not_connected_supported='1'
+			if [[ -z "${error_message}" ]]; then
+				error_message="$(echo -e "\e[1;31mNo Display connected to ${xrandr_output}.\e[0m")"
+			else
+				error_message="${error_message}\n$(echo -e "\e[1;31mNo Display connected to ${xrandr_output}.\e[0m")"
 			fi
 		fi
 	fi
@@ -304,15 +343,22 @@ function set_profile() {
 		fi
 
 		## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
-		#check_connected_displays "${profile_id_set}"
-		if [[ "${missing_display}" = '1' ]]; then
-			set_profile_error
+		#check_connected_edid "${profile_id_set}"
+		if [[ "${missing_edid}" = '1' ]]; then
 			error='1'
+			set_profile_error
 		fi
 
 		if [[ "${error}" != '1' ]]; then
-			xfconf-query --create -c displays -p /Schemes/Apply -t string -s "${profile_id_set}"
-			echo -e "\e[2;32mProfile ${profile_id_set} - ${profile_name} is set\e[0m"
+			list_verbose_profiles "${profile_id_set}" check_connected_supported
+			if [[ "${not_connected_supported}" = '1' ]]; then
+				error='1'
+				error_message="${error_message}\n$(echo -e "\e[1;31mCannot set profile ${profile_id_set} - ${profile_name}.\e[0m")"
+				echo -e "${error_message}"
+			else
+				xfconf-query --create -c displays -p /Schemes/Apply -t string -s "${profile_id_set}"
+				echo -e "\e[2;32mProfile ${profile_id_set} - ${profile_name} is set\e[0m"
+			fi
 		fi
 	fi
 }
@@ -378,7 +424,8 @@ function set_rem_profile_inizialize() {
 
 function set_profile_error() {
 
-	echo -e "\e[1;31mOne or more display in this profile are not connected. Cannot set profile ${profile_id_set} - ${profile_name}\e[0m"
+	echo -e "\e[1;31mOne or more display in this profile are not connected.\e[0m"
+	echo -e "\e[1;31mCannot set profile ${profile_id_set} - ${profile_name}\e[0m"
 }
 
 function yad_chooser() {
@@ -430,16 +477,20 @@ function yad_chooser() {
 			xfce4-display-settings
 		elif [[ "${profile_choice}" -eq '95' ]]; then
 			yad_profile_name="$(echo "${profile_yad}" | awk -F'|' '{print $1}' | awk -F',' '{print $1}')"
-			profile_id_rem="$(echo "${profiles}" | grep "${yad_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
+			profile_id_rem="$(echo "${profiles}" | grep ", name: ${yad_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
 			yad_remove_profile
 		elif [[ "${profile_choice}" -eq '94' ]]; then
 			true
 		elif [[ "${profile_choice}" -eq '93' ]]; then
 			yad_profile_name="$(echo "${profile_yad}" | awk -F'|' '{print $1}')"
-			profile_id_set="$(echo "${profiles}" | grep "${yad_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
+			profile_id_set="$(echo "${profiles}" | grep ", name: ${yad_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
 			set_profile
-			if [[ "${missing_display}" = '1' ]]; then
+			if [[ "${missing_edid}" = '1' ]]; then
 				error_text="$(set_profile_error | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+				yad_show_error
+			fi
+			if [[ "${not_connected_supported}" = '1' ]]; then
+				error_text="$(echo -e ${error_message} | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
 				yad_show_error
 			fi
 		else
@@ -530,7 +581,7 @@ function yad_check_error() {
 
 function yad_show_error() {
 
-	error_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "dialog-error" --text="Error:" --width=900 --height=200 --text-info <<<"${error_text}" --button="Exit"!exit!Exit:99)"
+	error_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "dialog-error" --text="Error:" --width=1000 --height=200 --text-info <<<"${error_text}" --button="Exit"!exit!Exit:99)"
 }
 
 function check_dependencies() {
@@ -618,7 +669,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.2.2
+# Version:    0.3.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
