@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.2.0
+# Version:    0.2.1
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -286,6 +286,67 @@ function check_active_profile() {
 
 function set_profile() {
 
+	set_rem_profile_inizialize "${profile_id_set}"
+
+	if [[ "${error}" != '1' ]]; then
+		if [[ "${active_profile_id}" = "${profile_id_set}" ]]; then
+			list_verbose_profiles "${profile_id_set}" check_active
+			if [[ "${active_profile_state}" != '1' ]]; then
+				echo -e "\e[1;33mProfile ${profile_id_set} - ${profile_name} is already active\e[0m"
+				error='1'
+			fi
+		fi
+
+		## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
+		#check_connected_displays "${profile_id_set}"
+		if [[ "${missing_display}" = '1' ]]; then
+			set_profile_error
+			error='1'
+		fi
+
+		if [[ "${error}" != '1' ]]; then
+			xfconf-query --create -c displays -p /Schemes/Apply -t string -s "${profile_id_set}"
+			echo -e "\e[2;32mProfile ${profile_id_set} - ${profile_name} is set\e[0m"
+		fi
+	fi
+}
+
+function remove_profile() {
+
+	set_rem_profile_inizialize "${profile_id_rem}"
+	if [[ "${error}" != '1' ]]; then
+		while true; do
+				echo -e "\e[1;31mAre you sure you want to remove profile ${profile_id_rem} - ${profile_name}?\e[0m"
+				echo -e "\e[1;32m(N)o\e[0m"
+				echo -e "\e[1;31m(Y)es\e[0m"
+				read -p "make your choice (No/yes): " rem_input
+
+				case "${rem_input}" in
+					N|n|NO|no|No|nO) {
+						echo
+						echo -e "\e[1;32mProfile ${profile_id_rem} - ${profile_name} not removed\e[0m"
+						break
+					};;
+					Y|y|YES|yes|Yes|YEs|yES|yeS|YeS|yEs) {
+						xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+						echo
+						echo -e "\e[1;33mProfile ${profile_id_rem} - ${profile_name} removed\e[0m"
+						break
+					};;
+					*) {
+						echo
+						echo -e "\e[1;31m## WRONG INPUT.......please be more careful\e[0m"
+						echo
+					};;
+				esac
+		done
+	fi
+}
+
+function set_rem_profile_inizialize() {
+
+	profile_id_set_rem="${1}"
+
 	if echo "${actions}" | grep -q 'list_profiles'; then
 		echo
 		if [[ "${verbose}" = 'true' ]]; then
@@ -294,43 +355,23 @@ function set_profile() {
 		fi
 	fi
 	unset error
-	profile_name="$(get_profile_name "${profile_id}")"
-
-	if [[ "${active_profile_id}" = "${profile_id}" ]]; then
-		list_verbose_profiles "${profile_id}" check_active
-		if [[ "${active_profile_state}" != '1' ]]; then
-			echo -e "\e[1;33mProfile ${profile_id} - ${profile_name} is already active\e[0m"
-			error='1'
-		fi
-	fi
+	profile_name="$(get_profile_name "${profile_id_set_rem}")"
 
 	exist='0'
 	for profiles_id in ${profiles_ids}; do
-		if echo "${profiles_id}" | grep -xq "${profile_id}"; then
+		if echo "${profiles_id}" | grep -xq "${profile_id_set_rem}"; then
 			exist='1'
 		fi
 	done
 	if [[ "${exist}" = '0' ]]; then
-		echo -e "\e[1;31mProfile id ${profile_id} does not exist\e[0m"
+		echo -e "\e[1;31mProfile id ${profile_id_set_rem} does not exist\e[0m"
 		error='1'
-	fi
-
-	## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
-	#check_connected_displays "${profile_id}"
-	if [[ "${missing_display}" = '1' ]]; then
-		set_profile_error
-		error='1'
-	fi
-
-	if [[ "${error}" != '1' ]]; then
-		xfconf-query --create -c displays -p /Schemes/Apply -t string -s "${profile_id}"
-		echo -e "\e[2;32mProfile ${profile_id} - ${profile_name} is set\e[0m"
 	fi
 }
 
 function set_profile_error() {
 
-	echo -e "\e[1;31mOne or more display in this profile are not connected. Cannot set profile ${profile_id} - ${profile_name}\e[0m"
+	echo -e "\e[1;31mOne or more display in this profile are not connected. Cannot set profile ${profile_id_set} - ${profile_name}\e[0m"
 }
 
 function yad_chooser() {
@@ -365,8 +406,9 @@ function yad_chooser() {
 		--button="Help"!help-about!"Show help":98 \
 		--button="Info"!user-info!"Show profiles info":97 \
 		--button="Display"!org.xfce.settings.display!"Open xfce4-display-settings":96 \
-		--button="Refresh"!view-refresh!"Refresh profiles list":95 \
-		--button="Set profile"!dialog-apply!"Set selected profile":94)"
+		--button="Remove profile"!user-trash-full!"Remove selected profile":95 \
+		--button="Refresh"!view-refresh!"Refresh profiles list":94 \
+		--button="Set profile"!dialog-apply!"Set selected profile":93)"
 		profile_choice="${?}"
 		default_profile="$(echo "${profile_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
 		fallback_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
@@ -380,10 +422,14 @@ function yad_chooser() {
 		elif [[ "${profile_choice}" -eq '96' ]]; then
 			xfce4-display-settings
 		elif [[ "${profile_choice}" -eq '95' ]]; then
-			true
+			yad_profile_name="$(echo "${profile_yad}" | awk -F'|' '{print $1}' | awk -F',' '{print $1}')"
+			profile_id_rem="$(echo "${profiles}" | grep "${yad_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
+			yad_remove_profile
 		elif [[ "${profile_choice}" -eq '94' ]]; then
-			profile="$(echo "${profile_yad}" | awk -F'|' '{print $1}')"
-			profile_id="$(echo "${profiles}" | grep "${profile}" | awk '{print $2}' | awk -F',' '{print $1}')"
+			true
+		elif [[ "${profile_choice}" -eq '93' ]]; then
+			yad_profile_name="$(echo "${profile_yad}" | awk -F'|' '{print $1}')"
+			profile_id_set="$(echo "${profiles}" | grep "${yad_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
 			set_profile
 			if [[ "${missing_display}" = '1' ]]; then
 				error_text="$(set_profile_error | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
@@ -401,10 +447,10 @@ function yad_help() {
 	info_help="$(givemehelp)"
 	help_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "help-about" --text="Help" --width=900 --height=500 --text-info <<<"${info_help}" --button="Exit"!exit!Exit:99 \
 	--button="Go back"!back!"Go back to profile selection menu":98)"
-	info_choice="${?}"
-	if [[ "${info_choice}" -eq '99' ]]; then
+	help_choice="${?}"
+	if [[ "${help_choice}" -eq '99' ]]; then
 		exit 0
-	elif [[ "${info_choice}" -eq '98' ]]; then
+	elif [[ "${help_choice}" -eq '98' ]]; then
 		true
 	else
 		exit 0
@@ -421,20 +467,38 @@ function yad_verbose() {
 		verbose_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --width=900 --height=800 --form --field="Profiles info:":txt "${info_verbose}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --button="Exit"!exit!Exit:99 \
 		--button="Refresh"!view-refresh!"Refresh profiles info":98 \
 		--button="Go back"!back!"Go back to profile selection menu":97)"
-		info_choice="${?}"
+		verbose_choice="${?}"
 		default_profile="$(echo "${verbose_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
 		fallback_profile="$(echo "${verbose_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
 		#unavailable_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
-		if [[ "${info_choice}" -eq '99' ]]; then
+		if [[ "${verbose_choice}" -eq '99' ]]; then
 			exit 0
-		elif [[ "${info_choice}" -eq '98' ]]; then
+		elif [[ "${verbose_choice}" -eq '98' ]]; then
 			true
-		elif [[ "${info_choice}" -eq '97' ]]; then
+		elif [[ "${verbose_choice}" -eq '97' ]]; then
 			break
 		else
 			exit 0
 		fi
 	done
+}
+
+function yad_remove_profile() {
+
+	remove_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "dialog-warning" --text="Are you sure you want to remove profile ${yad_profile_name}?\nThis action can't be undone!" --button="Exit"!exit!Exit:99 \
+	--button="Confirm"!user-trash-full!"Remove selected profile":98 \
+	--button="Go back"!back!"Go back to profile selection menu":97)"
+	rem_choice="${?}"
+	if [[ "${rem_choice}" -eq '99' ]]; then
+		exit 0
+	elif [[ "${rem_choice}" -eq '98' ]]; then
+		xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+		echo -e "\e[1;33mProfile ${profile_id_rem} - ${yad_profile_name} removed\e[0m"
+	elif [[ "${rem_choice}" -eq '97' ]]; then
+		echo -e "\e[1;32mProfile ${profile_id_rem} - ${yad_profile_name} not removed\e[0m"
+	else
+		exit 0
+	fi
 }
 
 function yad_check_error() {
@@ -547,15 +611,15 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.2.0
+# Version:    0.2.1
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
 
 ### DESCRIPTION
-With this bash script you can, via command line, list and set already configured display profiles in xfce4-display-settings.
-This is useful if you want e.g. to automate stuff by setting profiles with a script or to use a keyboard shortcut.
-A graphical user interface is provided with the use of yad.
+With this bash script you can, via command line, list, set and remove already configured display profiles in xfce4-display-settings.
+This is useful if you want e.g. to automate stuff by setting profiles within a script or to use a keyboard shortcut.
+A graphical user interface is provided with yad.
 
 ### TODO
 Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration.
@@ -572,6 +636,7 @@ Options:
 -v, --list-verbose                  Show profiles list with additional info
 -d, --list-default                  Show Default profile in profiles list
 -f, --list-fallback                 Show Fallback profile in profiles list
+-r, --remove-profile <profile_id>   Remove a profile
 -g, --gui                           Start with a graphical user interface
 -h, --help                          Show this help
 "
@@ -589,6 +654,7 @@ for opt in "$@"; do
 		'--list-verbose')		set -- "$@" '-v' ;;
 		'--list-default')		set -- "$@" '-d' ;;
 		'--list-fallback')		set -- "$@" '-f' ;;
+		'--remove-profile')		set -- "$@" '-r' ;;
 		'--list-unavailable')	set -- "$@" '-u' ;;
 		'--gui')				set -- "$@" '-g' ;;
 		'--help')				set -- "$@" '-h' ;;
@@ -596,9 +662,9 @@ for opt in "$@"; do
 	esac
 done
 
-while getopts "s:lvdfugh" opt; do
+while getopts "s:lvdfr:ugh" opt; do
 	case ${opt} in
-		s ) profile_id="${OPTARG}"; actions="${actions} set_profile"
+		s ) profile_id_set="${OPTARG}"; actions="${actions} set_profile"
 		;;
 		l ) actions="${actions} list_profiles"
 		;;
@@ -607,6 +673,8 @@ while getopts "s:lvdfugh" opt; do
 		d ) default_profile='true'; actions="${actions} list_profiles"
 		;;
 		f ) fallback_profile='true'; actions="${actions} list_profiles"
+		;;
+		r ) profile_id_rem="${OPTARG}"; actions="${actions} remove_profile"
 		;;
 		u ) unavailable_profile='true'; actions="${actions} list_profiles"
 		;;
@@ -648,6 +716,9 @@ if echo "${actions}" | grep -q 'list_profiles'; then
 fi
 if echo "${actions}" | grep -q 'set_profile'; then
 	set_profile
+fi
+if echo "${actions}" | grep -q 'remove_profile'; then
+	remove_profile
 fi
 
 if [[ "${error}" = '1' ]]; then
