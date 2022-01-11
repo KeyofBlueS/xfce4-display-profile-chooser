@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.2.1
+# Version:    0.2.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -99,15 +99,17 @@ function list_verbose_profiles() {
 		name="$(echo "${profile_output_prop}" | grep "${profile_output} " | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//')"
 		edid="$(echo "${profile_output_prop}" | grep '/EDID ' | awk '{print $2}')"
 		active="$(echo "${profile_output_prop}" | grep '/Active ' | awk '{print $2}')"
-		position_x="$(echo "${profile_output_prop}" | grep '/Position/X ' | awk '{print $2}')"
-		position_y="$(echo "${profile_output_prop}" | grep '/Position/Y ' | awk '{print $2}')"
-		primary="$(echo "${profile_output_prop}" | grep '/Primary ' | awk '{print $2}')"
-		reflection="$(echo "${profile_output_prop}" | grep '/Reflection ' | awk '{print $2}')"
-		refreshrate="$(echo "${profile_output_prop}" | grep '/RefreshRate ' | awk '{print $2}')"
-		resolution="$(echo "${profile_output_prop}" | grep '/Resolution ' | awk '{print $2}')"
-		rotation="$(echo "${profile_output_prop}" | grep '/Rotation ' | awk '{print $2}')"
-		scale_x="$(echo "${profile_output_prop}" | grep '/Scale/X ' | awk '{print $2}')"
-		scale_y="$(echo "${profile_output_prop}" | grep '/Scale/Y ' | awk '{print $2}')"
+		if [[ "${active}" = 'true' || "${get_verbose}" = 'Default' || "${get_verbose}" = 'Fallback' ]]; then
+			position_x="$(echo "${profile_output_prop}" | grep '/Position/X ' | awk '{print $2}')"
+			position_y="$(echo "${profile_output_prop}" | grep '/Position/Y ' | awk '{print $2}')"
+			primary="$(echo "${profile_output_prop}" | grep '/Primary ' | awk '{print $2}')"
+			reflection="$(echo "${profile_output_prop}" | grep '/Reflection ' | awk '{print $2}')"
+			refreshrate="$(echo "${profile_output_prop}" | grep '/RefreshRate ' | awk '{print $2}')"
+			resolution="$(echo "${profile_output_prop}" | grep '/Resolution ' | awk '{print $2}')"
+			rotation="$(echo "${profile_output_prop}" | grep '/Rotation ' | awk '{print $2}')"
+			scale_x="$(echo "${profile_output_prop}" | grep '/Scale/X ' | awk '{print $2}')"
+			scale_y="$(echo "${profile_output_prop}" | grep '/Scale/Y ' | awk '{print $2}')"
+		fi
 
 		if [[ "${action_verbose}" = 'show_verbose' ]]; then
 			show_verbose_profiles
@@ -187,46 +189,48 @@ function get_xrandr_variables() {
 	if [[ "${active}" = 'false' ]]; then
 		xrandr_active='connected'
 	fi
-	if [[ -n "${position_x}" ]]; then
-		xrandr_position_x="${position_x}"
-	fi
-	if [[ -n "${position_y}" ]]; then
-		xrandr_position_y="${position_y}"
-	fi
-	if [[ -n "${primary}" ]]; then
-		if [[ "${primary}" = 'true' ]]; then
-			xrandr_primary='primary'
+	if [[ "${active}" = 'true' || "${get_verbose}" = 'Default' || "${get_verbose}" = 'Fallback' ]]; then
+		if [[ -n "${position_x}" ]]; then
+			xrandr_position_x="${position_x}"
 		fi
-	fi
-	if [[ -n "${reflection}" ]]; then
-		if [[ "${reflection}" = '0' ]]; then
-			xrandr_reflection="normal"
-		else
-			xrandr_reflection="${reflection,,}"
+		if [[ -n "${position_y}" ]]; then
+			xrandr_position_y="${position_y}"
 		fi
-	fi
-	if [[ -n "${refreshrate}" ]]; then
-		xrandr_refreshrate="${refreshrate}"
-	fi
-	if [[ -n "${resolution}" ]]; then
-		xrandr_resolution="${resolution}"
-	fi
-	if [[ -n "${rotation}" ]]; then
-		if [[ "${rotation}" = '0' ]]; then
-			xrandr_rotation="normal"
-		elif [[ "${rotation}" = '90' ]]; then
-			xrandr_rotation="left"
-		elif [[ "${rotation}" = '180' ]]; then
-			xrandr_rotation="inverted"
-		elif [[ "${rotation}" = '270' ]]; then
-			xrandr_rotation="right"
+		if [[ -n "${primary}" ]]; then
+			if [[ "${primary}" = 'true' ]]; then
+				xrandr_primary='primary'
+			fi
 		fi
-	fi
-	if [[ -n "${scale_x}" ]]; then
-		xrandr_scale_x="${scale_x//,/$'.'}"
-	fi
-	if [[ -n "${scale_y}" ]]; then
-		xrandr_scale_y="${scale_y//,/$'.'}"
+		if [[ -n "${reflection}" ]]; then
+			if [[ "${reflection}" = '0' ]]; then
+				xrandr_reflection="normal"
+			else
+				xrandr_reflection="${reflection,,}"
+			fi
+		fi
+		if [[ -n "${refreshrate}" ]]; then
+			xrandr_refreshrate="${refreshrate}"
+		fi
+		if [[ -n "${resolution}" ]]; then
+			xrandr_resolution="${resolution}"
+		fi
+		if [[ -n "${rotation}" ]]; then
+			if [[ "${rotation}" = '0' ]]; then
+				xrandr_rotation="normal"
+			elif [[ "${rotation}" = '90' ]]; then
+				xrandr_rotation="left"
+			elif [[ "${rotation}" = '180' ]]; then
+				xrandr_rotation="inverted"
+			elif [[ "${rotation}" = '270' ]]; then
+				xrandr_rotation="right"
+			fi
+		fi
+		if [[ -n "${scale_x}" ]]; then
+			xrandr_scale_x="${scale_x//,/$'.'}"
+		fi
+		if [[ -n "${scale_y}" ]]; then
+			xrandr_scale_y="${scale_y//,/$'.'}"
+		fi
 	fi
 }
 
@@ -247,7 +251,9 @@ function check_active_profile() {
 		else
 			xrandr_resolution_state="${resolution}"
 		fi
-		xrandr_resolution_state="$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $1}')" * "${xrandr_scale_x}"")x$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $2}')" * "${xrandr_scale_y}"")"
+		if [[ "${xrandr_scale_x}" != '1.000000' || "${xrandr_scale_x}" != '1.000000' ]]; then
+			xrandr_resolution_state="$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $1}')" * "${xrandr_scale_x}"")x$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $2}')" * "${xrandr_scale_y}"")"
+		fi
 		xrandr_position_state="${xrandr_position_x}+${xrandr_position_y}"
 		if [[ "${xrandr_rotation}" != 'normal' ]]; then
 			xrandr_rotation_state="${xrandr_rotation}"
@@ -317,6 +323,7 @@ function remove_profile() {
 	if [[ "${error}" != '1' ]]; then
 		while true; do
 				echo -e "\e[1;31mAre you sure you want to remove profile ${profile_id_rem} - ${profile_name}?\e[0m"
+				echo -e "\e[1;31mThis action can't be undone!\e[0m"
 				echo -e "\e[1;32m(N)o\e[0m"
 				echo -e "\e[1;31m(Y)es\e[0m"
 				read -p "make your choice (No/yes): " rem_input
@@ -611,7 +618,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.2.1
+# Version:    0.2.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
