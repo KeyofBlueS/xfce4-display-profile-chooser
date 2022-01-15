@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.3.1
+# Version:    0.3.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -114,7 +114,6 @@ function list_verbose_profiles() {
 			scale_x="$(echo "${profile_output_prop}" | grep '/Scale/X ' | awk '{print $2}')"
 			scale_y="$(echo "${profile_output_prop}" | grep '/Scale/Y ' | awk '{print $2}')"
 		fi
-
 		if [[ "${action_verbose}" = 'show_verbose' ]]; then
 			show_verbose_profiles
 		elif [[ "${action_verbose}" = 'check_active' ]]; then
@@ -303,6 +302,7 @@ function check_connected_supported_display() {
 	get_xrandr_variables
 
 	if echo "${xrandr_prop}" | grep -q "${xrandr_output} connected"; then
+		if [[ "${xrandr_active}" = 'true' ]]; then
 		export xrandr_prop
 		export xrandr_output
 		xrandr_output_prop="$(perl -E '$_ = qx/echo "$ENV{xrandr_prop}"/; for (split /^(?!\s)/sm) { chomp; say if /^\S*$ENV{xrandr_output} /; }')"
@@ -315,6 +315,7 @@ function check_connected_supported_display() {
 			else
 				error_message="${error_message}\n$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
 			fi
+		fi
 		fi
 	else
 		if [[ "${skip_inactive}" = 'true' ]]; then
@@ -684,7 +685,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.3.1
+# Version:    0.3.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
