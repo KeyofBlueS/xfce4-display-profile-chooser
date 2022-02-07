@@ -1,6 +1,6 @@
 # xfce4-display-profile-chooser
 
-# Version:    0.3.2
+# Version:    0.3.3
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -36,6 +36,7 @@ Options:
 -f, --list-fallback                 Show Fallback profile in profiles list
 -r, --remove-profile <profile_id>   Remove a profile
 -k, --skip-inactive                 Skip check on outputs configured as inactive
+-a, --disable-askkeep               Disable <Would you like to keep this configuration?> question
 -g, --gui                           Start with a graphical user interface
 -h, --help                          Show this help
 ```
