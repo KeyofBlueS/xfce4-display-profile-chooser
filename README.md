@@ -11,7 +11,7 @@ This is useful if you want e.g. to automate stuff by setting profiles within a s
 A graphical user interface is provided with yad.
 
 ### TODO
-Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
+Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1. ANYWAY if your display/s are always the same, then this script could be considered reliable.
 
 ### INSTALL
 ```sh
