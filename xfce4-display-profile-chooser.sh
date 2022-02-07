@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.3.2
+# Version:    0.3.3
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -249,9 +249,9 @@ function check_active_profile() {
 				xrandr_primary_state="${xrandr_primary}"
 			fi
 			if [[ "${xrandr_rotation}" = 'left' || "${xrandr_rotation}" = 'right' ]]; then
-				xrandr_resolution_state="$(echo "${resolution}" | awk -F'x' '{print $2}')x$(echo "${resolution}" | awk -F'x' '{print $1}')"
+				xrandr_resolution_state="$(echo "${xrandr_resolution}" | awk -F'x' '{print $2}')x$(echo "${xrandr_resolution}" | awk -F'x' '{print $1}')"
 			else
-				xrandr_resolution_state="${resolution}"
+				xrandr_resolution_state="${xrandr_resolution}"
 			fi
 			if [[ "${xrandr_scale_x}" != '1.000000' || "${xrandr_scale_x}" != '1.000000' ]]; then
 				xrandr_resolution_state="$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $1}')" * "${xrandr_scale_x}"")x$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $2}')" * "${xrandr_scale_y}"")"
@@ -303,19 +303,19 @@ function check_connected_supported_display() {
 
 	if echo "${xrandr_prop}" | grep -q "${xrandr_output} connected"; then
 		if [[ "${xrandr_active}" = 'true' ]]; then
-		export xrandr_prop
-		export xrandr_output
-		xrandr_output_prop="$(perl -E '$_ = qx/echo "$ENV{xrandr_prop}"/; for (split /^(?!\s)/sm) { chomp; say if /^\S*$ENV{xrandr_output} /; }')"
-		xrandr_refreshrate_connected="$(echo "${xrandr_refreshrate}" | awk -F',' '{print $1}')"
-		xrandr_refreshrate_connected="${xrandr_refreshrate_connected//,/$'.'}"
-		if ! echo "${xrandr_output_prop}" | grep -E "^ +${resolution}" | grep -Eq " +${xrandr_refreshrate_connected}\.[[:digit:]]+"; then
-			not_connected_supported='1'
-			if [[ -z "${error_message}" ]]; then
-				error_message="$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
-			else
-				error_message="${error_message}\n$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
+			export xrandr_prop
+			export xrandr_output
+			xrandr_output_prop="$(perl -E '$_ = qx/echo "$ENV{xrandr_prop}"/; for (split /^(?!\s)/sm) { chomp; say if /^\S*$ENV{xrandr_output} /; }')"
+			xrandr_refreshrate_connected="$(echo "${xrandr_refreshrate}" | awk -F',' '{print $1}')"
+			xrandr_refreshrate_connected="${xrandr_refreshrate_connected//,/$'.'}"
+			if ! echo "${xrandr_output_prop}" | grep -E "^ +${xrandr_resolution}" | grep -Eq " +${xrandr_refreshrate_connected}\.[[:digit:]]+"; then
+				not_connected_supported='1'
+				if [[ -z "${error_message}" ]]; then
+					error_message="$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${xrandr_resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
+				else
+					error_message="${error_message}\n$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${xrandr_resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
+				fi
 			fi
-		fi
 		fi
 	else
 		if [[ "${skip_inactive}" = 'true' ]]; then
@@ -369,8 +369,50 @@ function set_profile() {
 			else
 				xfconf-query --create -c displays -p /Schemes/Apply -t string -s "${profile_id_set}"
 				echo -e "\e[2;32mProfile ${profile_id_set} - ${profile_name} is set\e[0m"
+				if [[ "${ask_keep_config}" = 'true' ]] && [[ "${yad}" != '1' ]]; then
+					keep_config_ask
+				fi
 			fi
 		fi
+	fi
+}
+
+function keep_config_ask() {
+
+	COUNT="${restore_countdown}"
+	echo -e "\e[1;33mWould you like to keep this configuration?\e[0m"
+	echo -e "\e[1;33mThe previous configuration will be restored in ${restore_countdown} seconds if you not reply to this question. \e[0m"
+	echo -e "\e[1;35m (K)eep this configuration\e[0m"
+	echo -e "\e[1;35m (R)estore the previous configuration\e[0m"
+	until [[ "${COUNT}" -eq "0" ]]; do
+		unset keep_config_answer
+		echo -en "\r\e[1;33mRestoring the previous configuration in \e[1;31m${COUNT}\e[1;33m \e[0m\c"
+		read -s -t 1 -N 1 keep_config_answer
+		keep_config_answer="${keep_config_answer,,}"
+		if [[ -n "${keep_config_answer}" ]]; then
+			if [[ "${keep_config_answer}" = 'k' || "${keep_config_answer}" = 'r' ]]; then
+				break
+			else
+				#echo
+				echo -en "\e[1;31m\rInvalid choice!\e[0m\c"
+				sleep 1
+			fi
+		fi
+		((COUNT-=1))
+	done
+
+	if [[ "${COUNT}" -eq "0" ]]; then
+		echo -en "\r\e[1;33mRestoring the previous configuration in \e[1;31m${COUNT}\e[1;33m \e[0m\c"
+	fi
+	echo
+	if [[ "${keep_config_answer}" = 'k' ]]; then
+		true
+	else
+		echo -e "\e[1;33mRestoring the previous configuration...\e[0m"
+		profile_id_set="${active_profile_id}"
+		inizialize
+		yad=1
+		set_profile
 	fi
 }
 
@@ -379,30 +421,30 @@ function remove_profile() {
 	set_rem_profile_inizialize "${profile_id_rem}"
 	if [[ "${error}" != '1' ]]; then
 		while true; do
-				echo -e "\e[1;31mAre you sure you want to remove profile ${profile_id_rem} - ${profile_name}?\e[0m"
-				echo -e "\e[1;31mThis action can't be undone!\e[0m"
-				echo -e "\e[1;32m(N)o\e[0m"
-				echo -e "\e[1;31m(Y)es\e[0m"
-				read -p "make your choice (No/yes): " rem_input
+			echo -e "\e[1;31mAre you sure you want to remove profile ${profile_id_rem} - ${profile_name}?\e[0m"
+			echo -e "\e[1;31mThis action can't be undone!\e[0m"
+			echo -e "\e[1;32m(N)o\e[0m"
+			echo -e "\e[1;31m(Y)es\e[0m"
+			read -p "make your choice (No/yes): " rem_input
 
-				case "${rem_input}" in
-					N|n|NO|no|No|nO) {
-						echo
-						echo -e "\e[1;32mProfile ${profile_id_rem} - ${profile_name} not removed\e[0m"
-						break
-					};;
-					Y|y|YES|yes|Yes|YEs|yES|yeS|YeS|yEs) {
-						xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
-						echo
-						echo -e "\e[1;33mProfile ${profile_id_rem} - ${profile_name} removed\e[0m"
-						break
-					};;
-					*) {
-						echo
-						echo -e "\e[1;31m## WRONG INPUT.......please be more careful\e[0m"
-						echo
-					};;
-				esac
+			case "${rem_input}" in
+				N|n|NO|no|No|nO) {
+					echo
+					echo -e "\e[1;32mProfile ${profile_id_rem} - ${profile_name} not removed\e[0m"
+					break
+				};;
+				Y|y|YES|yes|Yes|YEs|yES|yeS|YeS|yEs) {
+					xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+					echo
+					echo -e "\e[1;33mProfile ${profile_id_rem} - ${profile_name} removed\e[0m"
+					break
+				};;
+				*) {
+					echo
+					echo -e "\e[1;31m## WRONG INPUT.......please be more careful\e[0m"
+					echo
+				};;
+			esac
 		done
 	fi
 }
@@ -469,8 +511,8 @@ function yad_chooser() {
 		active_profile_state='0'
 		not_connected_supported='0'
 
-		#profile_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current profile: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --field="Show unavailable profiles":chk "${unavailable_profile}" --field="Skip checks on inactive outputs":chk "${skip_inactive}" --button="Exit"!exit!Exit:99 
-		profile_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current profile: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --field="Skip checks on inactive outputs":chk "${skip_inactive}" --button="Exit"!exit!Exit:99 \
+		#profile_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current profile: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --field="Show unavailable profiles":chk "${unavailable_profile}" --field="Skip checks on inactive outputs":chk "${skip_inactive}" --field="Ask if keep or restore profile":chk "${ask_keep_config}" --button="Exit"!exit!Exit:99 
+		profile_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "avatar-default" --text="Current profile: ${active_profile_name}" --form --field="Profile:CB" "${profiles_list}" --field="Show Default profile":chk "${default_profile}" --field="Show Fallback profile":chk "${fallback_profile}" --field="Skip checks on inactive outputs":chk "${skip_inactive}" --field="Ask if keep or restore profile":chk "${ask_keep_config}" --button="Exit"!exit!Exit:99 \
 		--button="Help"!help-about!"Show help":98 \
 		--button="Info"!user-info!"Show profiles info":97 \
 		--button="Display"!org.xfce.settings.display!"Open xfce4-display-settings":96 \
@@ -481,6 +523,7 @@ function yad_chooser() {
 		default_profile="$(echo "${profile_yad}" | awk -F'|' '{print $2}' | tr '[:upper:]' '[:lower:]')"
 		fallback_profile="$(echo "${profile_yad}" | awk -F'|' '{print $3}' | tr '[:upper:]' '[:lower:]')"
 		skip_inactive="$(echo "${profile_yad}" | awk -F'|' '{print $4}' | tr '[:upper:]' '[:lower:]')"
+		ask_keep_config="$(echo "${profile_yad}" | awk -F'|' '{print $5}' | tr '[:upper:]' '[:lower:]')"
 		#unavailable_profile="$(echo "${profile_yad}" | awk -F'|' '{print $5}' | tr '[:upper:]' '[:lower:]')"
 		if [[ "${profile_choice}" -eq '99' ]]; then
 			exit 0
@@ -499,6 +542,7 @@ function yad_chooser() {
 		elif [[ "${profile_choice}" -eq '93' ]]; then
 			yad_profile_name="$(echo "${profile_yad}" | awk -F'|' '{print $1}')"
 			profile_id_set="$(echo "${profiles}" | grep ", name: ${yad_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
+			yad='1'
 			set_profile
 			if [[ "${missing_edid}" = '1' ]]; then
 				error_text="$(set_profile_error | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
@@ -508,11 +552,45 @@ function yad_chooser() {
 				error_text="$(echo -e ${error_message} | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
 				yad_show_error
 			fi
+			if [[ "${ask_keep_config}" = 'true' ]] && [[ "${missing_edid}" != '1' ]] && [[ "${not_connected_supported}" != '1' ]] && [[ "${yad_profile_name}" != "${active_profile_name}" ]]; then
+				yad_keep_config
+			fi
 		else
 			exit 0
 		fi
 		unset profiles_list
 	done
+}
+
+function yad_keep_config() {
+
+	COUNT="${restore_countdown}"
+	START="${COUNT}"
+
+	until [[ "${COUNT}" -eq "0" ]]; do
+		PERCENT=$((100-100*COUNT/START))
+		echo "#The previous configuration will be restored in ${COUNT} seconds if you not reply to this question."
+		echo "${PERCENT}"
+		if [[ "${COUNT}" != '0' ]]; then
+			sleep 1
+		fi
+		((COUNT-=1))
+	done | yad ${ycommopt} --progress --percentage=0 --text="Would you like to keep this configuration?"\
+		--window-icon "xfce-display-external" --auto-close --button="Keep this configuration":99 \
+		--button="Restore the previous configuration":98
+
+	keep_config_answer="${?}"
+
+	if [[ "${keep_config_answer}" = '99' ]]; then
+		true
+	else
+		echo -e "\e[1;33mRestoring the previous configuration...\e[0m"
+		profile_id_set="$(echo "${profiles}" | grep ", name: ${active_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
+		inizialize
+		yad='1'
+		set_profile
+		unset yad
+	fi
 }
 
 function yad_help() {
@@ -685,7 +763,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.3.2
+# Version:    0.3.3
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -712,6 +790,7 @@ Options:
 -f, --list-fallback                 Show Fallback profile in profiles list
 -r, --remove-profile <profile_id>   Remove a profile
 -k, --skip-inactive                 Skip check on outputs configured as inactive
+-a, --disable-askkeep               Disable <Would you like to keep this configuration?> question
 -g, --gui                           Start with a graphical user interface
 -h, --help                          Show this help
 "
@@ -721,6 +800,8 @@ default_profile='false'
 fallback_profile='false'
 unavailable_profile='false'
 skip_inactive='false'
+ask_keep_config='true'
+restore_countdown='10'
 
 for opt in "$@"; do
 	shift
@@ -733,13 +814,14 @@ for opt in "$@"; do
 		'--remove-profile')		set -- "$@" '-r' ;;
 		'--list-unavailable')	set -- "$@" '-u' ;;
 		'--skip-inactive')		set -- "$@" '-k' ;;
+		'--disable-askkeep')	set -- "$@" '-a' ;;
 		'--gui')				set -- "$@" '-g' ;;
 		'--help')				set -- "$@" '-h' ;;
 		*)						set -- "$@" "$opt"
 	esac
 done
 
-while getopts "s:lvdfr:ukgh" opt; do
+while getopts "s:lvdfr:ukagh" opt; do
 	case ${opt} in
 		s ) profile_id_set="${OPTARG}"; actions="${actions} set_profile"
 		;;
@@ -756,6 +838,8 @@ while getopts "s:lvdfr:ukgh" opt; do
 		u ) unavailable_profile='true'; actions="${actions} list_profiles"
 		;;
 		k ) skip_inactive='true'
+		;;
+		a ) ask_keep_config='false'
 		;;
 		g ) actions="${actions} yad_chooser"
 		;;
