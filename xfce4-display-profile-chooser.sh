@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.3.3
+# Version:    0.3.4
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -195,10 +195,8 @@ function get_xrandr_variables() {
 	if [[ -n "${position_y}" ]]; then
 		xrandr_position_y="${position_y}"
 	fi
-	if [[ -n "${primary}" ]]; then
-		if [[ "${primary}" = 'true' ]]; then
-			xrandr_primary='primary'
-		fi
+	if [[ -n "${primary}" ]] && [[ "${primary}" = 'true' ]]; then
+		xrandr_primary='primary'
 	fi
 	if [[ -n "${reflection}" ]]; then
 		if [[ "${reflection}" = '0' ]]; then
@@ -275,7 +273,7 @@ function check_active_profile() {
 				if [[ -z "${xrandr_grep}" ]]; then
 					xrandr_grep="${xrandr_state}"
 				else
-					xrandr_grep="${xrandr_grep} ${xrandr_state}"
+					xrandr_grep+=" ${xrandr_state}"
 				fi
 			done
 
@@ -313,7 +311,7 @@ function check_connected_supported_display() {
 				if [[ -z "${error_message}" ]]; then
 					error_message="$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${xrandr_resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
 				else
-					error_message="${error_message}\n$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${xrandr_resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
+					error_message+="\n$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${xrandr_resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
 				fi
 			fi
 		fi
@@ -326,7 +324,7 @@ function check_connected_supported_display() {
 				if [[ -z "${error_message}" ]]; then
 					error_message="$(echo -e "\e[1;31mNo Display connected to ${xrandr_output}.\e[0m")"
 				else
-					error_message="${error_message}\n$(echo -e "\e[1;31mNo Display connected to ${xrandr_output}.\e[0m")"
+					error_message+="\n$(echo -e "\e[1;31mNo Display connected to ${xrandr_output}.\e[0m")"
 				fi
 			fi
 		else
@@ -334,7 +332,7 @@ function check_connected_supported_display() {
 			if [[ -z "${error_message}" ]]; then
 				error_message="$(echo -e "\e[1;31mNo Display connected to ${xrandr_output}.\e[0m")"
 			else
-				error_message="${error_message}\n$(echo -e "\e[1;31mNo Display connected to ${xrandr_output}.\e[0m")"
+				error_message+="\n$(echo -e "\e[1;31mNo Display connected to ${xrandr_output}.\e[0m")"
 			fi
 		fi
 	fi
@@ -393,7 +391,6 @@ function keep_config_ask() {
 			if [[ "${keep_config_answer}" = 'k' || "${keep_config_answer}" = 'r' ]]; then
 				break
 			else
-				#echo
 				echo -en "\e[1;31m\rInvalid choice!\e[0m\c"
 				sleep 1
 			fi
@@ -502,7 +499,7 @@ function yad_chooser() {
 			if [[ -z "${profiles_list}" ]]; then
 				profiles_list="${profiles_name}"
 			else
-				profiles_list="${profiles_list}!${profiles_name}"
+				profiles_list+="!${profiles_name}"
 			fi
 		done <<< "${profiles_names}"
 
@@ -596,7 +593,7 @@ function yad_keep_config() {
 function yad_help() {
 
 	info_help="$(givemehelp)"
-	help_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "help-about" --text="Help" --width=900 --height=500 --text-info <<<"${info_help}" --button="Exit"!exit!Exit:99 \
+	help_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "help-about" --text="Help" --width=1100 --height=500 --text-info <<<"${info_help}" --button="Exit"!exit!Exit:99 \
 	--button="Go back"!back!"Go back to profile selection menu":98)"
 	help_choice="${?}"
 	if [[ "${help_choice}" -eq '99' ]]; then
@@ -681,35 +678,35 @@ function yad_show_error() {
 function check_dependencies() {
 
 	commline_bins='xfconf-query xrandr perl awk cat grep'
-	gui_bins='yad xfce4-display-settings wmctrl'
-	for bin in ${commline_bins} ${gui_bins}; do
-		if ! command -v "${bin}" &>/dev/null; then
-			if [[ "${bin}" = 'xfconf-query' ]]; then
-				bin="xfconf"
-			fi
-			if [[ $bin = 'cat' ]]; then
-				bin="coreutils"
-			fi
-			if [[ $bin = 'xfce4-display-settings' ]]; then
-				bin="xfce4-settings"
-			fi
-			if [[ -z "${missing}" ]]; then
-				missing="${bin}"
-			else
-				missing="${missing} ${bin}"
-			fi
-		fi
-	done
-
 	for commline_bin in ${commline_bins}; do
-		if echo "${missing}" | grep -q "${commline_bin}"; then
+		if ! command -v "${commline_bin}" &>/dev/null; then
 			commline_error='1'
+			if [[ "${commline_bin}" = 'xfconf-query' ]]; then
+				commline_bin="xfconf"
+			fi
+			if [[ "${commline_bin}" = 'cat' ]]; then
+				commline_bin="coreutils"
+			fi
+			if [[ -z "${commline_missing}" ]]; then
+				commline_missing="${commline_bin}"
+			else
+				commline_missing+=" ${commline_bin}"
+			fi
 		fi
 	done
 
+	gui_bins='yad xfce4-display-settings wmctrl'
 	for gui_bin in ${gui_bins}; do
-		if echo "${missing}" | grep -q "${gui_bin}"; then
+		if ! command -v "${gui_bin}" &>/dev/null; then
 			gui_error='1'
+			if [[ "${gui_bin}" = 'xfce4-display-settings' ]]; then
+				gui_bin="xfce4-settings"
+			fi
+			if [[ -z "${gui_missing}" ]]; then
+				gui_missing="${gui_bin}"
+			else
+				gui_missing+=" ${gui_bin}"
+			fi
 		fi
 	done
 }
@@ -717,7 +714,7 @@ function check_dependencies() {
 function dependencies_error() {
 
 	if [[ "${commline_error}" = '1' ]]; then
-		echo -e "\e[1;31mERROR: This script require \e[1;34m${missing}\e[1;31m. Use e.g. \e[1;34msudo apt-get install ${missing}\e[0m"
+		echo -e "\e[1;31mERROR: This script require \e[1;34m${commline_missing}\e[1;31m. Use e.g. \e[1;34msudo apt-get install ${commline_missing}\e[0m"
 		echo -e "\e[1;31mInstall the requested dependencies and restart this script.\e[0m"
 		if [[ "${gui_error}" = '1' ]]; then
 			echo
@@ -725,7 +722,7 @@ function dependencies_error() {
 	fi
 
 	if [[ "${gui_error}" = '1' ]]; then
-		echo -e "\e[1;33mWARNING: This script require \e[1;34m${missing}\e[1;33m for the GUI. Use e.g. \e[1;34msudo apt-get install ${missing}\e[0m"
+		echo -e "\e[1;33mWARNING: This script require \e[1;34m${gui_missing}\e[1;33m for the GUI. Use e.g. \e[1;34msudo apt-get install ${gui_missing}\e[0m"
 		echo -e "\e[1;33mInstall the requested dependencies and restart this script.\e[0m"
 	fi
 }
@@ -763,7 +760,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.3.3
+# Version:    0.3.4
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -776,6 +773,7 @@ A graphical user interface is provided with yad.
 ### TODO
 Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration.
 Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
+ANYWAY if your display/s are always the same, then this script can be considered reliable.
 
 ### USAGE
 
@@ -854,12 +852,20 @@ then
     actions="${actions} list_profiles"
 fi
 
-if [[ "${skip_inactive}" = 'true' ]]; then
-	if [[ -z "${actions}" ]]; then
-		echo -e "\e[1;31mERROR: option -k must be used in conjunction with -s/-l/-v/-d/-f/-g\e[0m"
-		givemehelp
-		exit 1
-	fi
+if [[ "${skip_inactive}" = 'true' ]] && [[ -z "${actions}" ]]; then
+		error_options="$(echo -e "\e[1;31mERROR: option -k must be used in conjunction with -s/-l/-v/-d/-f/-g\e[0m")"
+fi
+if [[ "${ask_keep_config}" = 'false' ]] && [[ -z "${actions}" ]]; then
+		if [[ -z "${error_options}" ]]; then
+			error_options="$(echo -e "\e[1;31mERROR: option -a must be used in conjunction with -s/-g\e[0m")"
+		else
+			error_options+="\n$(echo -e "\e[1;31mERROR: option -a must be used in conjunction with -s/-g\e[0m")"
+		fi
+fi
+if [[ -n "${error_options}" ]]; then
+	echo -e "${error_options}"
+	givemehelp
+	exit 1
 fi
 
 if echo "${actions}" | grep -q 'yad_chooser'; then
