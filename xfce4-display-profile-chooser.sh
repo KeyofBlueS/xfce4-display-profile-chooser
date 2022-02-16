@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.3.4
+# Version:    0.3.5
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -251,7 +251,7 @@ function check_active_profile() {
 			else
 				xrandr_resolution_state="${xrandr_resolution}"
 			fi
-			if [[ "${xrandr_scale_x}" != '1.000000' || "${xrandr_scale_x}" != '1.000000' ]]; then
+			if [[ "${xrandr_scale_x}" != '1.000000' || "${xrandr_scale_y}" != '1.000000' ]]; then
 				xrandr_resolution_state="$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $1}')" * "${xrandr_scale_x}"")x$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $2}')" * "${xrandr_scale_y}"")"
 			fi
 			xrandr_position_state="+${xrandr_position_x}+${xrandr_position_y}"
@@ -760,7 +760,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.3.4
+# Version:    0.3.5
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
