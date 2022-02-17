@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.3.5
+# Version:    0.3.6
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -252,7 +252,7 @@ function check_active_profile() {
 				xrandr_resolution_state="${xrandr_resolution}"
 			fi
 			if [[ "${xrandr_scale_x}" != '1.000000' || "${xrandr_scale_y}" != '1.000000' ]]; then
-				xrandr_resolution_state="$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $1}')" * "${xrandr_scale_x}"")x$(perl -e "print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $2}')" * "${xrandr_scale_y}"")"
+				xrandr_resolution_state="$(echo - | awk "{print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $1}')" * "${xrandr_scale_x}"}")x$(echo - | awk "{print "$(echo "${xrandr_resolution_state}" | awk -F'x' '{print $2}')" * "${xrandr_scale_y}"}")"
 			fi
 			xrandr_position_state="+${xrandr_position_x}+${xrandr_position_y}"
 			if [[ "${xrandr_rotation}" != 'normal' ]]; then
@@ -277,9 +277,7 @@ function check_active_profile() {
 				fi
 			done
 
-			export xrandr_prop
-			export xrandr_output
-			xrandr_output_prop="$(perl -E '$_ = qx/echo "$ENV{xrandr_prop}"/; for (split /^(?!\s)/sm) { chomp; say if /^\S*$ENV{xrandr_output} /; }')"
+			xrandr_output_prop="$(echo "${xrandr_prop}" | awk -v output="^${xrandr_output} connected" '/connected/ {p = 0} $0 ~ output {p = 1} p')"
 			if ! echo "${xrandr_output_prop}" | grep -q "${xrandr_grep} ("; then
 				active_profile_state='1'
 			else
@@ -301,9 +299,7 @@ function check_connected_supported_display() {
 
 	if echo "${xrandr_prop}" | grep -q "${xrandr_output} connected"; then
 		if [[ "${xrandr_active}" = 'true' ]]; then
-			export xrandr_prop
-			export xrandr_output
-			xrandr_output_prop="$(perl -E '$_ = qx/echo "$ENV{xrandr_prop}"/; for (split /^(?!\s)/sm) { chomp; say if /^\S*$ENV{xrandr_output} /; }')"
+			xrandr_output_prop="$(echo "${xrandr_prop}" | awk -v output="^${xrandr_output} connected" '/connected/ {p = 0} $0 ~ output {p = 1} p')"
 			xrandr_refreshrate_connected="$(echo "${xrandr_refreshrate}" | awk -F',' '{print $1}')"
 			xrandr_refreshrate_connected="${xrandr_refreshrate_connected//,/$'.'}"
 			if ! echo "${xrandr_output_prop}" | grep -E "^ +${xrandr_resolution}" | grep -Eq " +${xrandr_refreshrate_connected}\.[[:digit:]]+"; then
@@ -677,7 +673,7 @@ function yad_show_error() {
 
 function check_dependencies() {
 
-	commline_bins='xfconf-query xrandr perl awk cat grep'
+	commline_bins='xfconf-query xrandr awk cat grep'
 	for commline_bin in ${commline_bins}; do
 		if ! command -v "${commline_bin}" &>/dev/null; then
 			commline_error='1'
@@ -760,7 +756,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.3.5
+# Version:    0.3.6
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
