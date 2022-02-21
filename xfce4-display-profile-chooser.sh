@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.3.6
+# Version:    0.3.7
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -113,6 +113,12 @@ function list_verbose_profiles() {
 			rotation="$(echo "${profile_output_prop}" | grep '/Rotation ' | awk '{print $2}')"
 			scale_x="$(echo "${profile_output_prop}" | grep '/Scale/X ' | awk '{print $2}')"
 			scale_y="$(echo "${profile_output_prop}" | grep '/Scale/Y ' | awk '{print $2}')"
+			if [[ -z "${scale_x}" ]]; then
+				scale_x='1,000000'
+			fi
+			if [[ -z "${scale_y}" ]]; then
+				scale_y='1,000000'
+			fi
 		fi
 		if [[ "${action_verbose}" = 'show_verbose' ]]; then
 			show_verbose_profiles
@@ -756,7 +762,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.3.6
+# Version:    0.3.7
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
