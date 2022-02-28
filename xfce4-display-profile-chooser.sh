@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.3.7
+# Version:    0.3.8
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -103,7 +103,7 @@ function list_verbose_profiles() {
 		name="$(echo "${profile_output_prop}" | grep "${profile_output} " | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//')"
 		edid="$(echo "${profile_output_prop}" | grep '/EDID ' | awk '{print $2}')"
 		active="$(echo "${profile_output_prop}" | grep '/Active ' | awk '{print $2}')"
-		if [[ "${active}" = 'true' || "${get_verbose}" = 'Default' || "${get_verbose}" = 'Fallback' ]]; then
+		if [[ "${active}" = 'true' || "${get_verbose}" = 'Default' || "${get_verbose}" = 'Fallback' ]] && [[ "${action_verbose}" != 'remove_profile_output' ]]; then
 			position_x="$(echo "${profile_output_prop}" | grep '/Position/X ' | awk '{print $2}')"
 			position_y="$(echo "${profile_output_prop}" | grep '/Position/Y ' | awk '{print $2}')"
 			primary="$(echo "${profile_output_prop}" | grep '/Primary ' | awk '{print $2}')"
@@ -126,6 +126,8 @@ function list_verbose_profiles() {
 			check_active_profile
 		elif [[ "${action_verbose}" = 'check_connected_supported' ]]; then
 			check_connected_supported_display
+		elif [[ "${action_verbose}" = 'list_profile_output' ]] && [[ -n "${profile_output}" ]] && [[ -n "${name}" ]]; then
+			remove_profile_outputs+="${profile_output},${name}\n"
 		fi
 	done
 	if [[ "${action_verbose}" = 'show_verbose' ]]; then
@@ -340,6 +342,54 @@ function check_connected_supported_display() {
 	fi
 }
 
+function set_rem_profile_menu() {
+
+	print_separator
+	while true; do
+		if [[ "${current_action}" = 'set_profile' ]]; then
+			echo -e "\e[1;32mSelect the profile you want to set:\e[0m"
+		elif [[ "${current_action}" = 'remove_profile' ]]; then
+			echo -e "\e[1;31mSelect the profile you want to remove:\e[0m"
+		fi
+		echo -e "\e[1;32m0) Exit\e[0m"
+		unset verbose
+		unset set_rem_profile_list
+		local i=0
+		while IFS= read -r exp_profile; do
+			i=$((i + 1))
+			if [[ -z "${set_rem_profile_list}" ]]; then
+				set_rem_profile_list+="${i}) ${exp_profile}"
+			else
+				set_rem_profile_list+="\n${i}) ${exp_profile}"
+			fi
+		done <<< "$(list_profiles)"
+		echo -e "${set_rem_profile_list}"
+
+		read -p "make your choice: " selected_profile
+
+		if [[ ! "${selected_profile}" =~ ^[[:digit:]]+$ ]] || [[ "${selected_profile}" -gt "${i}" ]]; then
+			echo
+			echo -e "\e[1;31m## WRONG INPUT.......please be more careful\e[0m"
+			echo
+		else
+			if [[ "${selected_profile}" = '0' ]]; then
+				break
+			else
+				selected_profile_id="$(echo -e "${set_rem_profile_list}" | sed -n "${selected_profile}"p | awk -F'id: ' '{print $2}' | awk -F',' '{print $1}')"
+				if [[ "${current_action}" = 'set_profile' ]]; then
+					profile_id_set="${selected_profile_id}"
+					set_profile
+				elif [[ "${current_action}" = 'remove_profile' ]]; then
+					profile_id_rem="${selected_profile_id}"
+					remove_profile
+				fi
+			fi
+		fi
+		inizialize
+		unset yad
+	done
+}
+
 function set_profile() {
 
 	set_rem_profile_inizialize "${profile_id_set}"
@@ -420,23 +470,41 @@ function remove_profile() {
 	set_rem_profile_inizialize "${profile_id_rem}"
 	if [[ "${error}" != '1' ]]; then
 		while true; do
+			unset remove_profile_outputs
+			list_verbose_profiles "${profile_id_rem}" list_profile_output
+			if [[ -z "${remove_profile_outputs}" ]] && [[ -n "${profile_id_rem}" ]]; then
+				echo -e "\e[1;31m${profile_id_rem} - ${profile_name} doesn't contain any output. Removing it...\e[0m"
+				xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+				echo -e "\e[1;33mProfile ${profile_id_rem} - ${profile_name} removed\e[0m"
+				break
+			fi
+			echo
 			echo -e "\e[1;31mAre you sure you want to remove profile ${profile_id_rem} - ${profile_name}?\e[0m"
-			echo -e "\e[1;31mThis action can't be undone!\e[0m"
-			echo -e "\e[1;32m(N)o\e[0m"
-			echo -e "\e[1;31m(Y)es\e[0m"
-			read -p "make your choice (No/yes): " rem_input
+			if [[ "${profile_id_rem}" = 'Default' || "${profile_id_rem}" = 'Fallback' ]]; then
+				echo -e "\e[1;31mWARNING: It is not recommended to remove ${profile_id_rem} profile!\e[0m"
+			fi
+			echo -e "\e[1;31mWARNING: This action can't be undone!\e[0m"
+			echo -e "\e[1;32m0) No\e[0m"
+			echo -e "\e[1;31m1) Yes\e[0m"
+			echo -e "\e[1;31m2) Remove single outputs from this profile...\e[0m"
+			read -p "make your choice: " rem_input
 
 			case "${rem_input}" in
-				N|n|NO|no|No|nO) {
+				0) {
 					echo
 					echo -e "\e[1;32mProfile ${profile_id_rem} - ${profile_name} not removed\e[0m"
 					break
 				};;
-				Y|y|YES|yes|Yes|YEs|yES|yeS|YeS|yEs) {
-					xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
-					echo
-					echo -e "\e[1;33mProfile ${profile_id_rem} - ${profile_name} removed\e[0m"
-					break
+				1) {
+					if [[ -n "${profile_id_rem}" ]]; then
+						xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+						echo
+						echo -e "\e[1;33mProfile ${profile_id_rem} - ${profile_name} removed\e[0m"
+						break
+					fi
+				};;
+				2) {
+					remove_profile_output
 				};;
 				*) {
 					echo
@@ -448,17 +516,81 @@ function remove_profile() {
 	fi
 }
 
+function remove_profile_output() {
+
+	while true; do
+		unset remove_profile_outputs
+		inizialize
+		list_verbose_profiles "${profile_id_rem}" list_profile_output
+		if [[ -z "${remove_profile_outputs}" ]]; then
+			break
+		fi
+		echo
+		echo -e "\e[1;31mSelect the output you want to remove from profile ${profile_id_rem} - ${profile_name}\e[0m"
+		echo -e "\e[1;32m0) Go back\e[0m"
+		unset remove_profile_outputs_list
+		local i=0
+		while IFS=, read -r exp_output exp_name; do
+			i=$((i + 1))
+			if [[ -z "${remove_profile_outputs_list}" ]]; then
+				remove_profile_outputs_list+="${i}) ${exp_name} on ${exp_output}"
+			else
+				remove_profile_outputs_list+="\n${i}) ${exp_name} on ${exp_output}"
+			fi
+		done <<< "$(echo -e "${remove_profile_outputs}")"
+		echo -e "\e[1;31m${remove_profile_outputs_list}\e[0m"
+
+		read -p "make your choice: " selected_output
+
+		if [[ ! "${selected_output}" =~ ^[[:digit:]]+$ ]] || [[ "${selected_output}" -gt "${i}" ]]; then
+			echo
+			echo -e "\e[1;31m## WRONG INPUT.......please be more careful\e[0m"
+			echo
+		else
+			if [[ "${selected_output}" = '0' ]]; then
+				break
+			else
+				remove_profile_output_name="$(echo -e "${remove_profile_outputs_list}" | sed -n "${selected_output}"p | awk -F') ' '{print $2}')"
+				remove_profile_output="$(echo "${remove_profile_output_name}" | rev | awk '{print $1}' | rev)"
+				while true; do
+					echo
+					echo -e "\e[1;31mAre you sure you want to remove ${remove_profile_output_name} from profile ${profile_id_rem} - ${profile_name}?\e[0m"
+					echo -e "\e[1;31mWARNING: This action can't be undone!\e[0m"
+					echo -e "\e[1;31mWARNING: If you remove all outputs, the whole profile will be deleted!\e[0m"
+					echo -e "\e[1;32m0) No\e[0m"
+					echo -e "\e[1;31m1) Yes\e[0m"
+					read -p "make your choice: " rem_output_input
+
+					case "${rem_output_input}" in
+						0) {
+							echo
+							echo -e "\e[1;32m${remove_profile_output_name} from profile ${profile_id_rem} - ${profile_name} not removed\e[0m"
+							break
+						};;
+						1) {
+							if [[ -n "${profile_id_rem}" ]]; then
+								xfconf-query --reset -c displays --property /"${profile_id_rem}"/"${remove_profile_output}" --recursive
+								echo
+								echo -e "\e[1;33m${remove_profile_output_name} from profile ${profile_id_rem} - ${profile_name} removed\e[0m"
+								break
+							fi
+						};;
+						*) {
+							echo
+							echo -e "\e[1;31m## WRONG INPUT.......please be more careful\e[0m"
+							echo
+						};;
+					esac
+				done
+			fi
+		fi
+	done
+}
+
 function set_rem_profile_inizialize() {
 
 	profile_id_set_rem="${1}"
-
-	if echo "${actions}" | grep -q 'list_profiles'; then
-		echo
-		if [[ "${verbose}" = 'true' ]]; then
-			echo '-----------------------------------------------------------------'
-			echo
-		fi
-	fi
+	print_separator
 	unset error
 	profile_name="$(get_profile_name "${profile_id_set_rem}")"
 
@@ -471,6 +603,17 @@ function set_rem_profile_inizialize() {
 	if [[ "${exist}" = '0' ]]; then
 		echo -e "\e[1;31mProfile id ${profile_id_set_rem} does not exist\e[0m"
 		error='1'
+	fi
+}
+
+function print_separator() {
+
+	if echo "${actions}" | grep -q 'list_profiles'; then
+		echo
+		if [[ "${verbose}" = 'true' ]]; then
+			echo '-----------------------------------------------------------------'
+			echo
+		fi
 	fi
 }
 
@@ -534,13 +677,13 @@ function yad_chooser() {
 			xfce4-display-settings
 		elif [[ "${profile_choice}" -eq '95' ]]; then
 			yad_profile_name="$(echo "${profile_yad}" | awk -F'|' '{print $1}' | awk -F',' '{print $1}')"
-			profile_id_rem="$(echo "${profiles}" | grep ", name: ${yad_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
+			profile_id_rem="$(echo "${profiles}" | awk -F', state: ' '{print $1}' | grep ", name: ${yad_profile_name}$" | awk -F'id: ' '{print $2}' | awk -F',' '{print $1}')"
 			yad_remove_profile
 		elif [[ "${profile_choice}" -eq '94' ]]; then
 			true
 		elif [[ "${profile_choice}" -eq '93' ]]; then
-			yad_profile_name="$(echo "${profile_yad}" | awk -F'|' '{print $1}')"
-			profile_id_set="$(echo "${profiles}" | grep ", name: ${yad_profile_name}" | awk '{print $2}' | awk -F',' '{print $1}')"
+			yad_profile_name="$(echo "${profile_yad}" | awk -F'|' '{print $1}' | awk -F',' '{print $1}')"
+			profile_id_set="$(echo "${profiles}" | awk -F', state: ' '{print $1}' | grep ", name: ${yad_profile_name}$" | awk -F'id: ' '{print $2}' | awk -F',' '{print $1}')"
 			yad='1'
 			set_profile
 			if [[ "${missing_edid}" = '1' ]]; then
@@ -636,17 +779,94 @@ function yad_verbose() {
 
 function yad_remove_profile() {
 
-	remove_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "dialog-warning" --text="Are you sure you want to remove profile ${yad_profile_name}?\nThis action can't be undone!" --button="Exit"!exit!Exit:99 \
-	--button="Confirm"!user-trash-full!"Remove selected profile":98 \
-	--button="Go back"!back!"Go back to profile selection menu":97)"
+		while true; do
+			list_verbose_profiles "${profile_id_rem}" list_profile_output
+			if [[ -z "${remove_profile_outputs}" ]] && [[ -n "${profile_id_rem}" ]]; then
+				echo "${yad_profile_name} doesn't contain any output. Removing it..."
+				xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+				echo -e "\e[1;33mProfile ${profile_id_rem} - ${yad_profile_name} removed\e[0m"
+				break
+			fi
+			unset default_fallback_rem_message
+			if [[ "${profile_id_rem}" = 'Default' || "${profile_id_rem}" = 'Fallback' ]]; then
+				default_fallback_rem_message="\nWARNING: It is not recommended to remove ${profile_id_rem} profile!"
+			fi
+			remove_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "dialog-warning" --text="Are you sure you want to remove profile ${yad_profile_name}?${default_fallback_rem_message}\nWARNING: This action can't be undone!" --button="Exit"!exit!Exit:99 \
+			--button="Confirm"!user-trash-full!"Remove selected profile":98 \
+			--button="Remove Outputs..."!video-display!"Remove single outputs from this profile...":97 \
+			--button="Go back"!back!"Go back to profile selection menu":96)"
+			rem_choice="${?}"
+			if [[ "${rem_choice}" -eq '99' ]]; then
+				exit 0
+			elif [[ "${rem_choice}" -eq '98' ]]; then
+				if [[ -n "${profile_id_rem}" ]]; then
+					xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+					echo -e "\e[1;33mProfile ${profile_id_rem} - ${yad_profile_name} removed\e[0m"
+					break
+				fi
+			elif [[ "${rem_choice}" -eq '97' ]]; then
+				yad_remove_profile_outputs
+			elif [[ "${rem_choice}" -eq '96' ]]; then
+				echo -e "\e[1;32mProfile ${profile_id_rem} - ${yad_profile_name} not removed\e[0m"
+				break
+			else
+				exit 0
+			fi
+		done
+}
+
+function yad_remove_profile_outputs() {
+
+	while true; do
+		unset profile_outputs_list
+		unset remove_profile_outputs
+		inizialize
+		list_verbose_profiles "${profile_id_rem}" list_profile_output
+		if [[ -z "${remove_profile_outputs}" ]]; then
+			break
+		fi
+		while IFS=, read -r exp_output exp_name; do
+			if [[ -z "${profile_outputs_list}" ]]; then
+				profile_outputs_list="${exp_name} on ${exp_output}"
+			else
+				profile_outputs_list+="!${exp_name} on ${exp_output}"
+			fi
+		done <<< "$(echo -e "${remove_profile_outputs}")"
+
+		profile_outputs_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "video-display" --text="Select the output you want to remove from profile ${yad_profile_name}" --form --field="Output:CB" "${profile_outputs_list}" --button="Exit"!exit!Exit:99 \
+		--button="Confirm"!user-trash-full!"Remove selected output":98 \
+		--button="Go back"!back!"Go back to profile removal menu":97)"
+		rem_choice="${?}"
+		if [[ "${rem_choice}" -eq '99' ]]; then
+			exit 0
+		elif [[ "${rem_choice}" -eq '98' ]]; then
+			profile_output_name="$(echo "${profile_outputs_yad}" | awk -F'|' '{print $1}')"
+			profile_output_rem="$(echo "${profile_output_name}" | rev | awk '{print $1}' | rev)"
+			yad_remove_profile_output
+		elif [[ "${rem_choice}" -eq '97' ]]; then
+			break
+		else
+			exit 0
+		fi
+	done
+}
+
+function yad_remove_profile_output() {
+
+	profile_output_yad="$(yad ${ycommopt} --window-icon "xfce-display-external" --image "dialog-warning" --text="Are you sure you want to remove ${profile_output_name} from profile ${yad_profile_name}?\nWARNING: This action can't be undone!\nWARNING: If you remove all outputs, the whole profile will be deleted!" --button="Exit"!exit!Exit:99 \
+	--button="Confirm"!user-trash-full!"Remove selected output":98 \
+	--button="Go back"!back!"Go back to profile output removal menu":97)"
 	rem_choice="${?}"
 	if [[ "${rem_choice}" -eq '99' ]]; then
 		exit 0
 	elif [[ "${rem_choice}" -eq '98' ]]; then
-		xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
-		echo -e "\e[1;33mProfile ${profile_id_rem} - ${yad_profile_name} removed\e[0m"
+		echo "${profile_id_rem} ${profile_output_rem}"
+		if [[ -n "${profile_id_rem}" ]]; then
+			xfconf-query --reset -c displays --property /"${profile_id_rem}"/"${profile_output_rem}" --recursive
+			echo -e "\e[1;33m${profile_output_name} from profile ${profile_id_rem} - ${yad_profile_name} removed\e[0m"
+		fi
 	elif [[ "${rem_choice}" -eq '97' ]]; then
-		echo -e "\e[1;32mProfile ${profile_id_rem} - ${yad_profile_name} not removed\e[0m"
+		echo -e "\e[1;32m${profile_output_name} from profile ${profile_id_rem} - ${yad_profile_name} not removed\e[0m"
 	else
 		exit 0
 	fi
@@ -762,7 +982,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.3.7
+# Version:    0.3.8
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -783,16 +1003,18 @@ $ xfce4-display-profile-chooser <option> <value>
 
 
 Options:
--s, --set-profile <profile_id>      Set a profile
--l, --list-profiles                 Show profiles list
--v, --list-verbose                  Show profiles list with additional info
--d, --list-default                  Show Default profile in profiles list
--f, --list-fallback                 Show Fallback profile in profiles list
--r, --remove-profile <profile_id>   Remove a profile
--k, --skip-inactive                 Skip check on outputs configured as inactive
--a, --disable-askkeep               Disable <Would you like to keep this configuration?> question
--g, --gui                           Start with a graphical user interface
--h, --help                          Show this help
+-s, --set-profile <profile_id>      Set a profile. Pass 'list' as <profile_id> to get a menu
+                                                   where you can choose a profile to set.
+-l, --list-profiles                 Show profiles list.
+-v, --list-verbose                  Show profiles list with additional info.
+-d, --list-default                  Show Default profile in profiles list.
+-f, --list-fallback                 Show Fallback profile in profiles list.
+-r, --remove-profile <profile_id>   Remove a profile. Pass 'list' as <profile_id> to get a menu
+                                                      where you can choose a profile to remove.
+-k, --skip-inactive                 Skip check on outputs configured as inactive.
+-a, --disable-askkeep               Disable <Would you like to keep this configuration?> question.
+-g, --gui                           Start with a graphical user interface.
+-h, --help                          Show this help.
 "
 }
 
@@ -891,13 +1113,27 @@ fi
 inizialize
 
 if echo "${actions}" | grep -q 'list_profiles'; then
-	list_profiles
+	if [[ "${verbose}" = 'true' ]]; then
+		list_profiles
+	elif [[ "${profile_id_set}" != 'list'  ]] && [[ "${profile_id_rem}" != 'list' ]]; then
+		list_profiles
+	fi
 fi
 if echo "${actions}" | grep -q 'set_profile'; then
-	set_profile
+	if [[ "${profile_id_set}" = 'list' ]]; then
+		current_action='set_profile'
+		set_rem_profile_menu
+	else
+		set_profile
+	fi
 fi
 if echo "${actions}" | grep -q 'remove_profile'; then
-	remove_profile
+	if [[ "${profile_id_rem}" = 'list' ]]; then
+		current_action='remove_profile'
+		set_rem_profile_menu
+	else
+		remove_profile
+	fi
 fi
 
 if [[ "${error}" = '1' ]]; then
