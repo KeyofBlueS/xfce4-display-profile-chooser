@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.3.8
+# Version:    0.4.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -100,6 +100,16 @@ function list_verbose_profiles() {
 	for profile_output in ${profile_outputs}; do
 		profile_output_prop="$(echo "${profiles_ids_prop}" | grep "/${get_verbose}/${profile_output}")"
 
+		unset position_x
+		unset position_y
+		unset primary
+		unset reflection
+		unset refreshrate
+		unset resolution
+		unset rotation
+		unset scale_x
+		unset scale_y
+
 		name="$(echo "${profile_output_prop}" | grep "${profile_output} " | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//')"
 		edid="$(echo "${profile_output_prop}" | grep '/EDID ' | awk '{print $2}')"
 		active="$(echo "${profile_output_prop}" | grep '/Active ' | awk '{print $2}')"
@@ -113,10 +123,10 @@ function list_verbose_profiles() {
 			rotation="$(echo "${profile_output_prop}" | grep '/Rotation ' | awk '{print $2}')"
 			scale_x="$(echo "${profile_output_prop}" | grep '/Scale/X ' | awk '{print $2}')"
 			scale_y="$(echo "${profile_output_prop}" | grep '/Scale/Y ' | awk '{print $2}')"
-			if [[ -z "${scale_x}" ]]; then
+			if [[ -z "${scale_x}" ]] && [[ "${action_verbose}" != 'show_verbose' ]] && [[ "${action_verbose}" != 'set_default_fallback_profile' ]]; then
 				scale_x='1,000000'
 			fi
-			if [[ -z "${scale_y}" ]]; then
+			if [[ -z "${scale_y}" ]] && [[ "${action_verbose}" != 'show_verbose' ]] && [[ "${action_verbose}" != 'set_default_fallback_profile' ]]; then
 				scale_y='1,000000'
 			fi
 		fi
@@ -128,6 +138,8 @@ function list_verbose_profiles() {
 			check_connected_supported_display
 		elif [[ "${action_verbose}" = 'list_profile_output' ]] && [[ -n "${profile_output}" ]] && [[ -n "${name}" ]]; then
 			remove_profile_outputs+="${profile_output},${name}\n"
+		elif [[ "${action_verbose}" = 'set_default_fallback_profile' ]]; then
+			set_default_fallback_profile
 		fi
 	done
 	if [[ "${action_verbose}" = 'show_verbose' ]]; then
@@ -147,15 +159,33 @@ function show_verbose_profiles() {
 		echo "EDID=${edid}"
 		echo "Active=${active}"
 		if [[ "${active}" = 'true' || "${get_verbose}" = 'Default' || "${get_verbose}" = 'Fallback' ]]; then
-			echo "Position_X=${position_x}"
-			echo "Position_Y=${position_y}"
-			echo "Primary=${primary}"
-			echo "Reflection=${reflection}"
-			echo "RefreshRate=${refreshrate}"
-			echo "Resolution=${resolution}"
-			echo "Rotation=${rotation}"
-			echo "Scale_X=${scale_x}"
-			echo "Scale_Y=${scale_y}"
+			if [[ -n "${position_x}" ]]; then
+				echo "Position_X=${position_x}"
+			fi
+			if [[ -n "${position_y}" ]]; then
+				echo "Position_Y=${position_y}"
+			fi
+			if [[ -n "${primary}" ]]; then
+				echo "Primary=${primary}"
+			fi
+			if [[ -n "${reflection}" ]]; then
+				echo "Reflection=${reflection}"
+			fi
+			if [[ -n "${refreshrate}" ]]; then
+				echo "RefreshRate=${refreshrate}"
+			fi
+			if [[ -n "${resolution}" ]]; then
+				echo "Resolution=${resolution}"
+			fi
+			if [[ -n "${rotation}" ]]; then
+				echo "Rotation=${rotation}"
+			fi
+			if [[ -n "${scale_x}" ]]; then
+				echo "Scale_X=${scale_x}"
+			fi
+			if [[ -n "${scale_y}" ]]; then
+				echo "Scale_Y=${scale_y}"
+			fi
 		fi
 
 		while IFS= read -r xrandr_opt; do
@@ -379,6 +409,7 @@ function set_rem_profile_menu() {
 				if [[ "${current_action}" = 'set_profile' ]]; then
 					profile_id_set="${selected_profile_id}"
 					set_profile
+					set_default_fallback_profile_inizialize
 				elif [[ "${current_action}" = 'remove_profile' ]]; then
 					profile_id_rem="${selected_profile_id}"
 					remove_profile
@@ -417,26 +448,82 @@ function set_profile() {
 				error_message="${error_message}\n$(echo -e "\e[1;31mCannot set profile ${profile_id_set} - ${profile_name}.\e[0m")"
 				echo -e "${error_message}"
 			else
-				xfconf-query --create -c displays -p /Schemes/Apply -t string -s "${profile_id_set}"
+				xfconf-query --create -c displays -p "/Schemes/Apply" -t string -s "${profile_id_set}"
 				echo -e "\e[2;32mProfile ${profile_id_set} - ${profile_name} is set\e[0m"
-				if [[ "${ask_keep_config}" = 'true' ]] && [[ "${yad}" != '1' ]]; then
+				if [[ "${ask_keep_config}" = 'true' ]] && [[ "${keep_config_ask_count}" != '1' ]] && [[ "${yad}" != '1' ]]; then
 					keep_config_ask
 				fi
+				unset keep_config_ask_count
 			fi
 		fi
 	fi
 }
 
+function set_default_fallback_profile_inizialize() {
+
+	if [[ "${profile_id_set}" != 'Default' ]] && [[ "${profile_id_set}" != 'Fallback' ]] && [[ "${error}" != '1' ]]; then
+		echo "Setting Default and Fallback profiles..."
+		for default_fallback in Default ${profile_id_set}; do
+			if [[ "${default_fallback}" = 'Default' ]]; then
+				xfconf-query --reset -c displays --property "/Fallback" --recursive
+			else
+				xfconf-query --reset -c displays --property "/Default" --recursive
+			fi
+			list_verbose_profiles "${default_fallback}" 'set_default_fallback_profile'
+		done
+	fi
+}
+
+function set_default_fallback_profile() {
+
+	if [[ "${get_verbose}" = 'Default' ]]; then
+		set_default_fallback='Fallback'
+	else
+		set_default_fallback='Default'
+	fi
+	xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}" --type string -s "${name}"
+	xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/Active" --type bool -s "${active}"
+	xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/EDID" --type string -s "${edid}"
+	if [[ -n "${position_x}" ]]; then
+		xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/Position/X" --type int -s "${position_x}"
+	fi
+	if [[ -n "${position_y}" ]]; then
+		xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/Position/Y" --type int -s "${position_y}"
+	fi
+	if [[ -n "${primary}" ]]; then
+		xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/Primary" --type bool -s "${primary}"
+	fi
+	if [[ -n "${reflection}" ]]; then
+		xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/Reflection" --type string -s "${reflection}"
+	fi
+	if [[ -n "${refreshrate}" ]]; then
+		xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/RefreshRate" --type double -s "${refreshrate//,/$'.'}"
+	fi
+	if [[ -n "${resolution}" ]]; then
+		xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/Resolution" --type string -s "${resolution}"
+	fi
+	if [[ -n "${rotation}" ]]; then
+		xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/Rotation" --type int -s "${rotation}"
+	fi
+	if [[ -n "${scale_x}" ]]; then
+		xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/Scale/X" --type double -s "${scale_x//,/$'.'}"
+	fi
+	if [[ -n "${scale_y}" ]]; then
+		xfconf-query -c displays --create -p "/${set_default_fallback}/${profile_output}/Scale/Y" --type double -s "${scale_y//,/$'.'}"
+	fi
+}
+
 function keep_config_ask() {
 
-	COUNT="${restore_countdown}"
+	keep_config_ask_count='1'
+	restore_count="${restore_countdown}"
 	echo -e "\e[1;33mWould you like to keep this configuration?\e[0m"
 	echo -e "\e[1;33mThe previous configuration will be restored in ${restore_countdown} seconds if you not reply to this question. \e[0m"
 	echo -e "\e[1;35m (K)eep this configuration\e[0m"
 	echo -e "\e[1;35m (R)estore the previous configuration\e[0m"
-	until [[ "${COUNT}" -eq "0" ]]; do
+	until [[ "${restore_count}" -eq '0' ]]; do
 		unset keep_config_answer
-		echo -en "\r\e[1;33mRestoring the previous configuration in \e[1;31m${COUNT}\e[1;33m \e[0m\c"
+		echo -en "\r\e[1;33mRestoring the previous configuration in \e[1;31m${restore_count}\e[1;33m \e[0m\c"
 		read -s -t 1 -N 1 keep_config_answer
 		keep_config_answer="${keep_config_answer,,}"
 		if [[ -n "${keep_config_answer}" ]]; then
@@ -447,11 +534,11 @@ function keep_config_ask() {
 				sleep 1
 			fi
 		fi
-		((COUNT-=1))
+		((restore_count-=1))
 	done
 
-	if [[ "${COUNT}" -eq "0" ]]; then
-		echo -en "\r\e[1;33mRestoring the previous configuration in \e[1;31m${COUNT}\e[1;33m \e[0m\c"
+	if [[ "${restore_count}" -eq '0' ]]; then
+		echo -en "\r\e[1;33mRestoring the previous configuration in \e[1;31m${restore_count}\e[1;33m \e[0m\c"
 	fi
 	echo
 	if [[ "${keep_config_answer}" = 'k' ]]; then
@@ -460,7 +547,6 @@ function keep_config_ask() {
 		echo -e "\e[1;33mRestoring the previous configuration...\e[0m"
 		profile_id_set="${active_profile_id}"
 		inizialize
-		yad=1
 		set_profile
 	fi
 }
@@ -474,7 +560,7 @@ function remove_profile() {
 			list_verbose_profiles "${profile_id_rem}" list_profile_output
 			if [[ -z "${remove_profile_outputs}" ]] && [[ -n "${profile_id_rem}" ]]; then
 				echo -e "\e[1;31m${profile_id_rem} - ${profile_name} doesn't contain any output. Removing it...\e[0m"
-				xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+				xfconf-query --reset -c displays --property "/${profile_id_rem}" --recursive
 				echo -e "\e[1;33mProfile ${profile_id_rem} - ${profile_name} removed\e[0m"
 				break
 			fi
@@ -497,7 +583,7 @@ function remove_profile() {
 				};;
 				1) {
 					if [[ -n "${profile_id_rem}" ]]; then
-						xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+						xfconf-query --reset -c displays --property "/${profile_id_rem}" --recursive
 						echo
 						echo -e "\e[1;33mProfile ${profile_id_rem} - ${profile_name} removed\e[0m"
 						break
@@ -569,7 +655,7 @@ function remove_profile_output() {
 						};;
 						1) {
 							if [[ -n "${profile_id_rem}" ]]; then
-								xfconf-query --reset -c displays --property /"${profile_id_rem}"/"${remove_profile_output}" --recursive
+								xfconf-query --reset -c displays --property "/${profile_id_rem}/${remove_profile_output}" --recursive
 								echo
 								echo -e "\e[1;33m${remove_profile_output_name} from profile ${profile_id_rem} - ${profile_name} removed\e[0m"
 								break
@@ -697,6 +783,7 @@ function yad_chooser() {
 			if [[ "${ask_keep_config}" = 'true' ]] && [[ "${missing_edid}" != '1' ]] && [[ "${not_connected_supported}" != '1' ]] && [[ "${yad_profile_name}" != "${active_profile_name}" ]]; then
 				yad_keep_config
 			fi
+			set_default_fallback_profile_inizialize
 		else
 			exit 0
 		fi
@@ -706,17 +793,17 @@ function yad_chooser() {
 
 function yad_keep_config() {
 
-	COUNT="${restore_countdown}"
-	START="${COUNT}"
+	restore_count="${restore_countdown}"
+	start_count="${restore_count}"
 
-	until [[ "${COUNT}" -eq "0" ]]; do
-		PERCENT=$((100-100*COUNT/START))
-		echo "#The previous configuration will be restored in ${COUNT} seconds if you not reply to this question."
-		echo "${PERCENT}"
-		if [[ "${COUNT}" != '0' ]]; then
+	until [[ "${restore_count}" -eq '0' ]]; do
+		percent_count=$((100-100*restore_count/start_count))
+		echo "#The previous configuration will be restored in ${restore_count} seconds if you not reply to this question."
+		echo "${percent_count}"
+		if [[ "${restore_count}" != '0' ]]; then
 			sleep 1
 		fi
-		((COUNT-=1))
+		((restore_count-=1))
 	done | yad ${ycommopt} --progress --percentage=0 --text="Would you like to keep this configuration?"\
 		--window-icon "xfce-display-external" --auto-close --button="Keep this configuration":99 \
 		--button="Restore the previous configuration":98
@@ -783,7 +870,7 @@ function yad_remove_profile() {
 			list_verbose_profiles "${profile_id_rem}" list_profile_output
 			if [[ -z "${remove_profile_outputs}" ]] && [[ -n "${profile_id_rem}" ]]; then
 				echo "${yad_profile_name} doesn't contain any output. Removing it..."
-				xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+				xfconf-query --reset -c displays --property "/${profile_id_rem}" --recursive
 				echo -e "\e[1;33mProfile ${profile_id_rem} - ${yad_profile_name} removed\e[0m"
 				break
 			fi
@@ -800,7 +887,7 @@ function yad_remove_profile() {
 				exit 0
 			elif [[ "${rem_choice}" -eq '98' ]]; then
 				if [[ -n "${profile_id_rem}" ]]; then
-					xfconf-query --reset -c displays --property /"${profile_id_rem}" --recursive
+					xfconf-query --reset -c displays --property "/${profile_id_rem}" --recursive
 					echo -e "\e[1;33mProfile ${profile_id_rem} - ${yad_profile_name} removed\e[0m"
 					break
 				fi
@@ -862,7 +949,7 @@ function yad_remove_profile_output() {
 	elif [[ "${rem_choice}" -eq '98' ]]; then
 		echo "${profile_id_rem} ${profile_output_rem}"
 		if [[ -n "${profile_id_rem}" ]]; then
-			xfconf-query --reset -c displays --property /"${profile_id_rem}"/"${profile_output_rem}" --recursive
+			xfconf-query --reset -c displays --property "/${profile_id_rem}/${profile_output_rem}" --recursive
 			echo -e "\e[1;33m${profile_output_name} from profile ${profile_id_rem} - ${yad_profile_name} removed\e[0m"
 		fi
 	elif [[ "${rem_choice}" -eq '97' ]]; then
@@ -982,20 +1069,31 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.3.8
+# Version:    0.4.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
 
 ### DESCRIPTION
-With this bash script you can, via command line, list, set and remove already configured display profiles in xfce4-display-settings.
-This is useful if you want e.g. to automate stuff by setting profiles within a script or to use a keyboard shortcut.
-A graphical user interface is provided with yad.
+With this bash script you can manage Xfce display profiles configured in xfce4-display-settings.
+This is useful if you want e.g. to automate stuff by setting profiles within a script or with a keyboard shortcut.
+Minimum required version of Xfce is 4.14.
 
-### TODO
-Prevent the application of a profile that contains one or more displays that are not connected, cause it can lead to a misconfiguration.
-Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
-ANYWAY if your display/s are always the same, then this script can be considered reliable.
+### FEATURES
+- Set Xfce display profile (option --set-profile <profile_id>). Pass 'list' as <profile_id> to get a menu where you can choose a profile to set.
+Various checks are performed to assure a profile can be applied in first place.
+The question 'Would you like to keep this configuration?' will be asked after applying a profile, the previous configuration will be restored within 10 seconds if you not reply to this question (this question can be disabled with option --disable-askkeep).
+After a profile is successfully applied, the previous profile will be configured as Fallback profile and the current active profile will be configured as Default profile.
+
+- List all Xfce display profiles (option --list-profiles). The profile set as /displays/ActiveProfile in Xfconf will be highlighted, the state is 'set; active' if actual display cofiguration match the ActiveProfile, otherwise is 'set; not active'.
+
+- List verbose will show Xfce display profiles configuration (option --list-verbose). The equivalent xrandr command to set a profile will also be shown, useful if you want to port an Xfce display profile in other desktop environments.
+
+- Remove Xfce display profile or remove single outputs from an Xfce display profile (option --remove-profile <profile_id>). Pass 'list' as <profile_id> to get a menu where you can choose a profile to remove.
+
+- Apply a profile even if there are missing displays, but only if said displays are configured as inactive in a Xfce display profile (option --skip-inactive).
+
+- All of these features can be used via command line or with a graphical user interface (option --gui).
 
 ### USAGE
 
@@ -1045,25 +1143,25 @@ done
 
 while getopts "s:lvdfr:ukagh" opt; do
 	case ${opt} in
-		s ) profile_id_set="${OPTARG}"; actions="${actions} set_profile"
+		s ) profile_id_set="${OPTARG}"; actions+=' set_profile'
 		;;
-		l ) actions="${actions} list_profiles"
+		l ) actions+=' list_profiles'
 		;;
-		v ) verbose='true'; actions="${actions} list_profiles"
+		v ) verbose='true'; actions+=' list_profiles'
 		;;
-		d ) default_profile='true'; actions="${actions} list_profiles"
+		d ) default_profile='true'; actions+=' list_profiles'
 		;;
-		f ) fallback_profile='true'; actions="${actions} list_profiles"
+		f ) fallback_profile='true'; actions+=' list_profiles'
 		;;
-		r ) profile_id_rem="${OPTARG}"; actions="${actions} remove_profile"
+		r ) profile_id_rem="${OPTARG}"; actions+=' remove_profile'
 		;;
-		u ) unavailable_profile='true'; actions="${actions} list_profiles"
+		u ) unavailable_profile='true'; actions+=' list_profiles'
 		;;
 		k ) skip_inactive='true'
 		;;
 		a ) ask_keep_config='false'
 		;;
-		g ) actions="${actions} yad_chooser"
+		g ) actions+=' yad_chooser'
 		;;
 		h ) givemehelp; exit 0
 		;;
@@ -1073,7 +1171,7 @@ done
 
 if ((OPTIND == 1))
 then
-    actions="${actions} list_profiles"
+    actions+=' list_profiles'
 fi
 
 if [[ "${skip_inactive}" = 'true' ]] && [[ -z "${actions}" ]]; then
@@ -1125,6 +1223,7 @@ if echo "${actions}" | grep -q 'set_profile'; then
 		set_rem_profile_menu
 	else
 		set_profile
+		set_default_fallback_profile_inizialize
 	fi
 fi
 if echo "${actions}" | grep -q 'remove_profile'; then
