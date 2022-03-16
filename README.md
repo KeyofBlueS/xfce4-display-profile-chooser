@@ -16,13 +16,13 @@ Various checks are performed to assure a profile can be applied in first place.
 The question 'Would you like to keep this configuration?' will be asked after applying a profile, the previous configuration will be restored within 10 seconds if you not reply to this question (this question can be disabled with option --disable-askkeep).
 After a profile is successfully applied, the previous profile will be configured as Fallback profile and the current active profile will be configured as Default profile.
 
-- List all Xfce display profiles. The profile set as /displays/ActiveProfile in Xfconf will be highlighted, the state is 'set; active' if current display/s cofiguration match the ActiveProfile, otherwise is 'set; not active'.
+- List all Xfce display profiles (option --list-profiles). The profile set as /displays/ActiveProfile in Xfconf will be highlighted, the state is 'set; active' if actual display cofiguration match the ActiveProfile, otherwise is 'set; not active'.
 
 - List verbose will show Xfce display profiles configuration (option --list-verbose). The equivalent xrandr command to set a profile will also be shown, useful if you want to port an Xfce display profile in other desktop environments.
 
 - Remove Xfce display profile or remove single outputs from an Xfce display profile (option --remove-profile <profile_id>). Pass 'list' as <profile_id> to get a menu where you can choose a profile to remove.
 
-- Apply a profile even if there are missing display/s, but only if said display/s are configured as inactive in a Xfce display profile (option --skip-inactive).
+- Apply a profile even if there are missing displays, but only if said displays are configured as inactive in a Xfce display profile (option --skip-inactive).
 
 - All of these features can be used via command line or with a graphical user interface (option --gui).
 
