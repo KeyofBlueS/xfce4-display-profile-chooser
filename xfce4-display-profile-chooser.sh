@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.4.0
+# Version:    0.4.1
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -322,6 +322,10 @@ function check_active_profile() {
 				if ! echo "${xrandr_output_prop}" | grep -Eq " +${xrandr_refreshrate_state}\.[[:digit:]]+\*"; then
 					active_profile_state='1'
 				fi
+			fi
+		else
+			if ! echo "${xrandr_prop}" | grep -q "${xrandr_output} connected ("; then
+				active_profile_state='1'
 			fi
 		fi
 	else
@@ -1069,7 +1073,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.4.0
+# Version:    0.4.1
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
