@@ -1056,7 +1056,7 @@ function xfce_error() {
 function inizialize() {
 
 	profiles_ids_prop="$(xfconf-query -v -l -c displays)"
-	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -Ev "(ActiveProfile|Schemes|IdentityPopups)")"
+	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -Ev "(ActiveProfile|Schemes|IdentityPopups|Notify|AutoEnableProfiles|Schemas)")"
 	active_profile_id="$(echo "${profiles_ids_prop}" | grep '/ActiveProfile' | awk '{print $2}')"
 	if [[ "${active_profile_id}" = 'Default' ]]; then
 		default_profile='true'
