@@ -303,8 +303,8 @@ function check_active_profile() {
 					xrandr_reflection_state="X and Y axis"
 				fi
 			fi
-			xrandr_refreshrate_state="$(echo "${xrandr_refreshrate}" | awk -F',' '{print $1}')"
-			xrandr_refreshrate_state="${xrandr_refreshrate_state//,/$'.'}"
+			xrandr_refreshrate_state="${xrandr_refreshrate//,/$'.'}"
+			xrandr_refreshrate_state="$(echo "${xrandr_refreshrate_state}" | awk -F'.' '{print $1}')"
 
 			unset xrandr_grep
 			for xrandr_state in ${xrandr_output} connected ${xrandr_primary_state} ${xrandr_resolution_state}${xrandr_position_state} ${xrandr_rotation_state} ${xrandr_reflection_state}; do
@@ -342,8 +342,8 @@ function check_connected_supported_display() {
 	if echo "${xrandr_prop}" | grep -q "${xrandr_output} connected"; then
 		if [[ "${xrandr_active}" = 'true' ]]; then
 			xrandr_output_prop="$(echo "${xrandr_prop}" | awk -v output="^${xrandr_output} connected" '/connected/ {p = 0} $0 ~ output {p = 1} p')"
-			xrandr_refreshrate_connected="$(echo "${xrandr_refreshrate}" | awk -F',' '{print $1}')"
-			xrandr_refreshrate_connected="${xrandr_refreshrate_connected//,/$'.'}"
+			xrandr_refreshrate_connected="${xrandr_refreshrate//,/$'.'}"
+			xrandr_refreshrate_connected="$(echo "${xrandr_refreshrate_connected}" | awk -F'.' '{print $1}')"
 			if ! echo "${xrandr_output_prop}" | grep -E "^ +${xrandr_resolution}" | grep -Eq " +${xrandr_refreshrate_connected}\.[[:digit:]]+"; then
 				not_connected_supported='1'
 				if [[ -z "${error_message}" ]]; then
