@@ -144,7 +144,7 @@ function list_verbose_profiles() {
 	done
 	if [[ "${action_verbose}" = 'show_verbose' ]]; then
 		echo
-		echo 'xrand command to set this profile:'
+		echo 'xrandr command to set this profile:'
 		echo "xrandr${xrandr_command}"
 		unset xrandr_command
 	fi
