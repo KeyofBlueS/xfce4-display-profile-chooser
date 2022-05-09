@@ -305,6 +305,8 @@ function check_active_profile() {
 			fi
 			xrandr_refreshrate_state="${xrandr_refreshrate//,/$'.'}"
 			xrandr_refreshrate_state="$(echo "${xrandr_refreshrate_state}" | awk -F'.' '{print $1}')"
+			xrandr_refreshrate_state_plus="$((${xrandr_refreshrate_state}+1))"
+			xrandr_refreshrate_state_minus="$((${xrandr_refreshrate_state}-1))"
 
 			unset xrandr_grep
 			for xrandr_state in ${xrandr_output} connected ${xrandr_primary_state} ${xrandr_resolution_state}${xrandr_position_state} ${xrandr_rotation_state} ${xrandr_reflection_state}; do
@@ -319,7 +321,7 @@ function check_active_profile() {
 			if ! echo "${xrandr_output_prop}" | grep -q "${xrandr_grep} ("; then
 				active_profile_state='1'
 			else
-				if ! echo "${xrandr_output_prop}" | grep -Eq " +${xrandr_refreshrate_state}\.[[:digit:]]+\*"; then
+				if ! echo "${xrandr_output_prop}" | grep -Eq " +(${xrandr_refreshrate_state}|${xrandr_refreshrate_state_plus}|${xrandr_refreshrate_state_minus})\.[[:digit:]]+\*"; then
 					active_profile_state='1'
 				fi
 			fi
@@ -344,7 +346,9 @@ function check_connected_supported_display() {
 			xrandr_output_prop="$(echo "${xrandr_prop}" | awk -v output="^${xrandr_output} connected" '/connected/ {p = 0} $0 ~ output {p = 1} p')"
 			xrandr_refreshrate_connected="${xrandr_refreshrate//,/$'.'}"
 			xrandr_refreshrate_connected="$(echo "${xrandr_refreshrate_connected}" | awk -F'.' '{print $1}')"
-			if ! echo "${xrandr_output_prop}" | grep -E "^ +${xrandr_resolution}" | grep -Eq " +${xrandr_refreshrate_connected}\.[[:digit:]]+"; then
+			xrandr_refreshrate_connected_plus="$((${xrandr_refreshrate_connected}+1))"
+			xrandr_refreshrate_connected_minus="$((${xrandr_refreshrate_connected}-1))"
+			if ! echo "${xrandr_output_prop}" | grep -E "^ +${xrandr_resolution}" | grep -Eq " +(${xrandr_refreshrate_connected}|${xrandr_refreshrate_connected_plus}|${xrandr_refreshrate_connected_minus})\.[[:digit:]]+"; then
 				not_connected_supported='1'
 				if [[ -z "${error_message}" ]]; then
 					error_message="$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${xrandr_resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
