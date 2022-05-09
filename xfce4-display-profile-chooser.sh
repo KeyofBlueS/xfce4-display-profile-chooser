@@ -209,21 +209,24 @@ function xrandr_options() {
 		echo "--pos ${xrandr_position_x}x${xrandr_position_y}"
 		echo "--rotate ${xrandr_rotation}"
 		echo "--reflect ${xrandr_reflection}"
-		echo "--scale ${xrandr_scale_x}x${xrandr_scale_y}"
+		if [[ -n "${xrandr_scale_x}" ]] && [[ -n "${xrandr_scale_y}" ]]; then
+			echo "--scale ${xrandr_scale_x}x${xrandr_scale_y}"
+		fi
 	fi
 }
 
 function get_xrandr_variables() {
-
 	unset xrandr_output
 	unset xrandr_active
 	unset xrandr_primary
 	unset xrandr_resolution
 	unset xrandr_refreshrate
-	unset xrandr_position
+	unset xrandr_position_x
+	unset xrandr_position_y
 	unset xrandr_rotation
 	unset xrandr_reflection
-	unset xrandr_scale
+	unset xrandr_scale_x
+	unset xrandr_scale_y
 
 	xrandr_output="${profile_output}"
 	xrandr_active="${active}"
