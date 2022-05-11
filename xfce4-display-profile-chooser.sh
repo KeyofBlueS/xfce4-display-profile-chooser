@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.4.1
+# Version:    0.4.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -26,9 +26,10 @@ function get_profile_name() {
 
 	get_name="${1}"
 	if [[ "${get_name}" = 'Default' || "${get_name}" = 'Fallback' ]]; then
-		echo "${get_name}"
+		profile_name="${get_name}"
 	else
-		echo "${profiles_ids_prop}" | grep "/${get_name}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g"
+		#profile_name="$(echo "${profiles_ids_prop}" | grep "/${get_name}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+		profile_name="$(xfconf-query -c displays -p "/${get_name}")"
 	fi
 }
 
@@ -36,7 +37,8 @@ function list_profiles() {
 
 	first_profile_item='0'
 	for profiles_id in ${profiles_ids}; do
-		profile_name="$(get_profile_name "${profiles_id}")"
+		#profile_name="$(get_profile_name "${profiles_id}")"
+		get_profile_name "${profiles_id}"
 		if [[ "${profiles_id}" = 'Default' ]] && [[ "${default_profile}" != 'true' ]]; then
 			continue
 		elif [[ "${profiles_id}" = 'Fallback' ]] && [[ "${fallback_profile}" != 'true' ]]; then
@@ -144,7 +146,7 @@ function list_verbose_profiles() {
 	done
 	if [[ "${action_verbose}" = 'show_verbose' ]]; then
 		echo
-		echo 'xrand command to set this profile:'
+		echo 'xrandr command to set this profile:'
 		echo "xrandr${xrandr_command}"
 		unset xrandr_command
 	fi
@@ -209,7 +211,9 @@ function xrandr_options() {
 		echo "--pos ${xrandr_position_x}x${xrandr_position_y}"
 		echo "--rotate ${xrandr_rotation}"
 		echo "--reflect ${xrandr_reflection}"
-		echo "--scale ${xrandr_scale_x}x${xrandr_scale_y}"
+		if [[ -n "${xrandr_scale_x}" ]] && [[ -n "${xrandr_scale_y}" ]]; then
+			echo "--scale ${xrandr_scale_x}x${xrandr_scale_y}"
+		fi
 	fi
 }
 
@@ -220,10 +224,12 @@ function get_xrandr_variables() {
 	unset xrandr_primary
 	unset xrandr_resolution
 	unset xrandr_refreshrate
-	unset xrandr_position
+	unset xrandr_position_x
+	unset xrandr_position_y
 	unset xrandr_rotation
 	unset xrandr_reflection
-	unset xrandr_scale
+	unset xrandr_scale_x
+	unset xrandr_scale_y
 
 	xrandr_output="${profile_output}"
 	xrandr_active="${active}"
@@ -303,8 +309,10 @@ function check_active_profile() {
 					xrandr_reflection_state="X and Y axis"
 				fi
 			fi
-			xrandr_refreshrate_state="$(echo "${xrandr_refreshrate}" | awk -F',' '{print $1}')"
-			xrandr_refreshrate_state="${xrandr_refreshrate_state//,/$'.'}"
+			xrandr_refreshrate_state="${xrandr_refreshrate//,/$'.'}"
+			xrandr_refreshrate_state="$(echo "${xrandr_refreshrate_state}" | awk -F'.' '{print $1}')"
+			xrandr_refreshrate_state_plus="$((${xrandr_refreshrate_state}+1))"
+			xrandr_refreshrate_state_minus="$((${xrandr_refreshrate_state}-1))"
 
 			unset xrandr_grep
 			for xrandr_state in ${xrandr_output} connected ${xrandr_primary_state} ${xrandr_resolution_state}${xrandr_position_state} ${xrandr_rotation_state} ${xrandr_reflection_state}; do
@@ -319,7 +327,7 @@ function check_active_profile() {
 			if ! echo "${xrandr_output_prop}" | grep -q "${xrandr_grep} ("; then
 				active_profile_state='1'
 			else
-				if ! echo "${xrandr_output_prop}" | grep -Eq " +${xrandr_refreshrate_state}\.[[:digit:]]+\*"; then
+				if ! echo "${xrandr_output_prop}" | grep -Eq " +(${xrandr_refreshrate_state}|${xrandr_refreshrate_state_plus}|${xrandr_refreshrate_state_minus})\.[[:digit:]]+\*"; then
 					active_profile_state='1'
 				fi
 			fi
@@ -342,9 +350,11 @@ function check_connected_supported_display() {
 	if echo "${xrandr_prop}" | grep -q "${xrandr_output} connected"; then
 		if [[ "${xrandr_active}" = 'true' ]]; then
 			xrandr_output_prop="$(echo "${xrandr_prop}" | awk -v output="^${xrandr_output} connected" '/connected/ {p = 0} $0 ~ output {p = 1} p')"
-			xrandr_refreshrate_connected="$(echo "${xrandr_refreshrate}" | awk -F',' '{print $1}')"
-			xrandr_refreshrate_connected="${xrandr_refreshrate_connected//,/$'.'}"
-			if ! echo "${xrandr_output_prop}" | grep -E "^ +${xrandr_resolution}" | grep -Eq " +${xrandr_refreshrate_connected}\.[[:digit:]]+"; then
+			xrandr_refreshrate_connected="${xrandr_refreshrate//,/$'.'}"
+			xrandr_refreshrate_connected="$(echo "${xrandr_refreshrate_connected}" | awk -F'.' '{print $1}')"
+			xrandr_refreshrate_connected_plus="$((${xrandr_refreshrate_connected}+1))"
+			xrandr_refreshrate_connected_minus="$((${xrandr_refreshrate_connected}-1))"
+			if ! echo "${xrandr_output_prop}" | grep -E "^ +${xrandr_resolution}" | grep -Eq " +(${xrandr_refreshrate_connected}|${xrandr_refreshrate_connected_plus}|${xrandr_refreshrate_connected_minus})\.[[:digit:]]+"; then
 				not_connected_supported='1'
 				if [[ -z "${error_message}" ]]; then
 					error_message="$(echo -e "\e[1;31mDisplay connected to ${xrandr_output} do not support this profile (${xrandr_resolution} ${xrandr_refreshrate_connected}Hz).\e[0m")"
@@ -682,7 +692,8 @@ function set_rem_profile_inizialize() {
 	profile_id_set_rem="${1}"
 	print_separator
 	unset error
-	profile_name="$(get_profile_name "${profile_id_set_rem}")"
+	#profile_name="$(get_profile_name "${profile_id_set_rem}")"
+	get_profile_name "${profile_id_set_rem}"
 
 	exist='0'
 	for profiles_id in ${profiles_ids}; do
@@ -1056,7 +1067,7 @@ function xfce_error() {
 function inizialize() {
 
 	profiles_ids_prop="$(xfconf-query -v -l -c displays)"
-	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -Ev "(ActiveProfile|Schemes|IdentityPopups)")"
+	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -E "^(Default|Fallback|[[:alnum:]]{40})$")"
 	active_profile_id="$(echo "${profiles_ids_prop}" | grep '/ActiveProfile' | awk '{print $2}')"
 	if [[ "${active_profile_id}" = 'Default' ]]; then
 		default_profile='true'
@@ -1073,7 +1084,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.4.1
+# Version:    0.4.2
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
