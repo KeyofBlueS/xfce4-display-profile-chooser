@@ -26,9 +26,10 @@ function get_profile_name() {
 
 	get_name="${1}"
 	if [[ "${get_name}" = 'Default' || "${get_name}" = 'Fallback' ]]; then
-		echo "${get_name}"
+		profile_name="${get_name}"
 	else
-		echo "${profiles_ids_prop}" | grep "/${get_name}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g"
+		#profile_name="$(echo "${profiles_ids_prop}" | grep "/${get_name}" | awk 'NR==1{for (i=1;i<=NF;i++) printf("%s ",$i)}' | grep -oP '(?<=\ ).*' | sed 's/ $//' | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")"
+		profile_name="$(xfconf-query -c displays -p "/${get_name}")"
 	fi
 }
 
@@ -36,7 +37,8 @@ function list_profiles() {
 
 	first_profile_item='0'
 	for profiles_id in ${profiles_ids}; do
-		profile_name="$(get_profile_name "${profiles_id}")"
+		#profile_name="$(get_profile_name "${profiles_id}")"
+		get_profile_name "${profiles_id}"
 		if [[ "${profiles_id}" = 'Default' ]] && [[ "${default_profile}" != 'true' ]]; then
 			continue
 		elif [[ "${profiles_id}" = 'Fallback' ]] && [[ "${fallback_profile}" != 'true' ]]; then
@@ -216,6 +218,7 @@ function xrandr_options() {
 }
 
 function get_xrandr_variables() {
+
 	unset xrandr_output
 	unset xrandr_active
 	unset xrandr_primary
@@ -689,7 +692,8 @@ function set_rem_profile_inizialize() {
 	profile_id_set_rem="${1}"
 	print_separator
 	unset error
-	profile_name="$(get_profile_name "${profile_id_set_rem}")"
+	#profile_name="$(get_profile_name "${profile_id_set_rem}")"
+	get_profile_name "${profile_id_set_rem}"
 
 	exist='0'
 	for profiles_id in ${profiles_ids}; do
