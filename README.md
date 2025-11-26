@@ -1,6 +1,6 @@
 # xfce4-display-profile-chooser
 
-# Version:    0.4.2
+# Version:    0.5.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
