@@ -2,7 +2,7 @@
 
 # xfce4-display-profile-chooser
 
-# Version:    0.4.2
+# Version:    0.5.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
@@ -1053,7 +1053,7 @@ function dependencies_error() {
 
 function check_xfce() {
 
-	if ! echo "${XDG_CURRENT_DESKTOP}" | grep -iq 'xfce'; then
+	if [[ "${XDG_CURRENT_DESKTOP}" != 'XFCE' ]]; then
 		not_xfce='1'
 	fi
 }
@@ -1067,7 +1067,7 @@ function xfce_error() {
 function inizialize() {
 
 	profiles_ids_prop="$(xfconf-query -v -l -c displays)"
-	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -E "^(Default|Fallback|[[:alnum:]]{40})$")"
+	profiles_ids="$(echo "${profiles_ids_prop}" | awk -F'/' '{print $2}' | awk '{print $1}' | uniq | grep -E "^(Default|Fallback|[[:alnum:]]{40}|[[:alnum:]]{8}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{12})$")"
 	active_profile_id="$(echo "${profiles_ids_prop}" | grep '/ActiveProfile' | awk '{print $2}')"
 	if [[ "${active_profile_id}" = 'Default' ]]; then
 		default_profile='true'
@@ -1084,7 +1084,7 @@ function givemehelp() {
 	echo "
 # xfce4-display-profile-chooser
 
-# Version:    0.4.2
+# Version:    0.5.0
 # Author:     KeyofBlueS
 # Repository: https://github.com/KeyofBlueS/xfce4-display-profile-chooser
 # License:    GNU General Public License v3.0, https://opensource.org/licenses/GPL-3.0
