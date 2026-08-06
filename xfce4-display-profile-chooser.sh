@@ -9,17 +9,60 @@
 
 function check_connected_edid()	{
 
-	## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
 	profile_id_check="${1}"
 	missing_edid='0'
-	profile_edids="$(echo "${profiles_ids_prop}" | grep "${profile_id_check}" | grep '/EDID ' | awk '{print $2}')"
+	profile_edids="$(echo "${profiles_ids_prop}" | grep "^/${profile_id_check}/" | grep '/EDID ' | awk '{print $2}')"
 	for profile_edid in ${profile_edids}; do
+		edid_is_connected='0'
 		for connected_edid in ${connected_edids}; do
-			if ! echo "${connected_edid}" | grep -xq "${profile_edid}"; then
-				missing_edid='1'
+			if echo "${connected_edid}" | grep -xq "${profile_edid}"; then
+				edid_is_connected='1'
+				break
 			fi
 		done
+		if [[ "${edid_is_connected}" != '1' ]]; then
+			missing_edid='1'
+		fi
 	done
+}
+
+function get_connected_edids() {
+
+	## xfce4-settings stores each output's EDID as a SHA1 checksum of the first
+	## 128 bytes (the base EDID block) of the raw EDID blob (see xfce-randr.c,
+	## g_compute_checksum_for_data(G_CHECKSUM_SHA1, edid_data, 128)).
+	## We rebuild the same checksum from the "EDID:" property xrandr exposes for
+	## each connected output, so it can be compared against the profile's stored
+	## EDID values.
+
+	unset connected_edids
+	unset edid_output
+	unset edid_hex
+	in_edid='0'
+
+	while IFS= read -r xrandr_prop_line; do
+		if echo "${xrandr_prop_line}" | grep -q ' connected'; then
+			if [[ -n "${edid_output}" ]] && [[ -n "${edid_hex}" ]]; then
+				connected_edids+="$(echo "${edid_hex}" | cut -c1-256 | xxd -r -p | sha1sum | awk '{print $1}') "
+			fi
+			edid_output="$(echo "${xrandr_prop_line}" | awk '{print $1}')"
+			unset edid_hex
+			in_edid='0'
+		elif echo "${xrandr_prop_line}" | grep -q 'EDID:'; then
+			in_edid='1'
+		elif [[ "${in_edid}" = '1' ]] && echo "${xrandr_prop_line}" | grep -Eq '^[[:space:]]+[0-9a-fA-F]+$'; then
+			edid_hex="${edid_hex}$(echo "${xrandr_prop_line}" | tr -d '[:space:]')"
+		else
+			in_edid='0'
+		fi
+	done <<< "$(xrandr --prop)"
+
+	if [[ -n "${edid_output}" ]] && [[ -n "${edid_hex}" ]]; then
+		connected_edids+="$(echo "${edid_hex}" | cut -c1-256 | xxd -r -p | sha1sum | awk '{print $1}') "
+	fi
+	unset edid_output
+	unset edid_hex
+	unset in_edid
 }
 
 function get_profile_name() {
@@ -54,8 +97,7 @@ function list_profiles() {
 				profile_color='1;33'
 			fi
 		else
-			## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
-			#check_connected_edid "${profiles_id}"
+			check_connected_edid "${profiles_id}"
 			if [[ "${missing_edid}" = '1' ]]; then
 				if [[ "${unavailable_profile}" != 'true' ]]; then
 					continue
@@ -448,8 +490,7 @@ function set_profile() {
 			fi
 		fi
 
-		## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
-		#check_connected_edid "${profile_id_set}"
+		check_connected_edid "${profile_id_set}"
 		if [[ "${missing_edid}" = '1' ]]; then
 			error='1'
 			set_profile_error
@@ -470,6 +511,28 @@ function set_profile() {
 				unset keep_config_ask_count
 			fi
 		fi
+	fi
+}
+
+function set_profile_by_name() {
+
+	profile_name_set="${1}"
+	unset profile_id_set
+
+	for profiles_id in ${profiles_ids}; do
+		get_profile_name "${profiles_id}"
+		if [[ "${profile_name}" = "${profile_name_set}" ]]; then
+			profile_id_set="${profiles_id}"
+			break
+		fi
+	done
+
+	if [[ -z "${profile_id_set}" ]]; then
+		echo -e "\e[1;31mERROR: No profile found with name '${profile_name_set}'\e[0m"
+		error='1'
+	else
+		set_profile
+		set_default_fallback_profile_inizialize
 	fi
 }
 
@@ -1001,19 +1064,19 @@ function yad_show_error() {
 
 function check_dependencies() {
 
-	commline_bins='xfconf-query xrandr awk cat grep'
+	commline_bins='xfconf-query xrandr awk cat grep sha1sum xxd'
 	for commline_bin in ${commline_bins}; do
 		if ! command -v "${commline_bin}" &>/dev/null; then
 			commline_error='1'
 			if [[ "${commline_bin}" = 'xfconf-query' ]]; then
 				commline_bin="xfconf"
 			fi
-			if [[ "${commline_bin}" = 'cat' ]]; then
+			if [[ "${commline_bin}" = 'cat' || "${commline_bin}" = 'sha1sum' ]]; then
 				commline_bin="coreutils"
 			fi
 			if [[ -z "${commline_missing}" ]]; then
 				commline_missing="${commline_bin}"
-			else
+			elif ! echo "${commline_missing}" | grep -qw "${commline_bin}"; then
 				commline_missing+=" ${commline_bin}"
 			fi
 		fi
@@ -1075,8 +1138,7 @@ function inizialize() {
 		fallback_profile='true'
 	fi
 
-	## TODO: check if configured displays in profile are connected. Help is needed, please see https://github.com/KeyofBlueS/xfce4-display-profile-chooser/issues/1
-	#CONNECTED_EDIDS="$(some command to get current connected displays EDID the same way as seen in xconf-query)"
+	get_connected_edids
 }
 
 function givemehelp() {
@@ -1118,6 +1180,7 @@ $ xfce4-display-profile-chooser <option> <value>
 Options:
 -s, --set-profile <profile_id>      Set a profile. Pass 'list' as <profile_id> to get a menu
                                                    where you can choose a profile to set.
+-n, --set-profile-by-name <name>    Set a profile by its name instead of its id.
 -l, --list-profiles                 Show profiles list.
 -v, --list-verbose                  Show profiles list with additional info.
 -d, --list-default                  Show Default profile in profiles list.
@@ -1142,6 +1205,7 @@ for opt in "$@"; do
 	shift
 	case "$opt" in
 		'--set-profile')		set -- "$@" '-s' ;;
+		'--set-profile-by-name')	set -- "$@" '-n' ;;
 		'--list-profiles')		set -- "$@" '-l' ;;
 		'--list-verbose')		set -- "$@" '-v' ;;
 		'--list-default')		set -- "$@" '-d' ;;
@@ -1156,9 +1220,11 @@ for opt in "$@"; do
 	esac
 done
 
-while getopts "s:lvdfr:ukagh" opt; do
+while getopts "s:n:lvdfr:ukagh" opt; do
 	case ${opt} in
 		s ) profile_id_set="${OPTARG}"; actions+=' set_profile'
+		;;
+		n ) profile_name_set="${OPTARG}"; actions+=' set_profile_by_name'
 		;;
 		l ) actions+=' list_profiles'
 		;;
@@ -1232,7 +1298,7 @@ if echo "${actions}" | grep -q 'list_profiles'; then
 		list_profiles
 	fi
 fi
-if echo "${actions}" | grep -q 'set_profile'; then
+if echo "${actions}" | grep -qw 'set_profile'; then
 	if [[ "${profile_id_set}" = 'list' ]]; then
 		current_action='set_profile'
 		set_rem_profile_menu
@@ -1240,6 +1306,9 @@ if echo "${actions}" | grep -q 'set_profile'; then
 		set_profile
 		set_default_fallback_profile_inizialize
 	fi
+fi
+if echo "${actions}" | grep -qw 'set_profile_by_name'; then
+	set_profile_by_name "${profile_name_set}"
 fi
 if echo "${actions}" | grep -q 'remove_profile'; then
 	if [[ "${profile_id_rem}" = 'list' ]]; then
