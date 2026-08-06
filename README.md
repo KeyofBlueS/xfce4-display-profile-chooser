@@ -44,6 +44,7 @@ $ xfce4-display-profile-chooser <option> <value>
 Options:
 -s, --set-profile <profile_id>      Set a profile. Pass 'list' as <profile_id> to get a menu
                                                    where you can choose a profile to set.
+-n, --set-profile-by-name <name>    Set a profile by its name instead of its id.
 -l, --list-profiles                 Show profiles list.
 -v, --list-verbose                  Show profiles list with additional info.
 -d, --list-default                  Show Default profile in profiles list.
